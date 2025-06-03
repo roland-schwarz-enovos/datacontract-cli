@@ -67,6 +67,10 @@ schema:
         businessName: receiver id
         logicalType: string
         physicalType: varchar(18)
+        logicalTypeOptions:   ## addon rs
+          minLength: 0
+          maxLength: 18
+          pattern: '[a-zA-Z0-9]{0,18}'
         required: false
         description: A description for column rcvr_id.
         partitioned: false
@@ -74,6 +78,10 @@ schema:
         criticalDataElement: false
         tags: [ ]
         classification: restricted
+        quality:              ## addon rs
+        - rule: duplicateCount
+          mustBeLessThan: 1
+          unit: rows
       - name: rcvr_cntry_code
         primaryKey: false
         primaryKeyPosition: -1
@@ -111,6 +119,9 @@ schema:
                 value:
               - property: COMPARISON_TYPE
                 value: Greater than
+          - rule: validValues   ##addon rs
+            validValues: ['de','lu','fr','be','nl','pt','es','ch','at','li','hr','rs','hu','cz','sl','sk','pl','ro','bg','al','gr','ua','mk','ee','lv','ge']
+
     quality:
       - rule: countCheck
         type: library

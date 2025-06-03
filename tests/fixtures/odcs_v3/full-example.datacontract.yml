@@ -47,6 +47,9 @@ models:
         primaryKey: true
         description: A description for column rcvr_id.
         classification: restricted
+        minLength: 0
+        maxLength: 18
+        pattern: '[a-zA-Z0-9]{0,18}'
         config:
           postgresType: varchar(18)
           partitioned: false

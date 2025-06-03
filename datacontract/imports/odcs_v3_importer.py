@@ -348,9 +348,21 @@ def import_fields(
                 else {},
                 config=import_field_config(odcs_property, server_type),
                 format=getattr(odcs_property, "format", None),
-                minLength=odcs_property.logicalTypeOptions["minLength"] if odcs_property.logicalTypeOptions is not None and "minLength" in odcs_property.logicalTypeOptions else None,
-                maxLength=odcs_property.logicalTypeOptions["maxLength"] if odcs_property.logicalTypeOptions is not None and "maxLength" in odcs_property.logicalTypeOptions else None,
-                pattern=odcs_property.logicalTypeOptions["pattern"] if odcs_property.logicalTypeOptions is not None and "pattern" in odcs_property.logicalTypeOptions else None,                
+                minLength=odcs_property.logicalTypeOptions["minLength"]
+                if odcs_property.logicalTypeOptions is not None and "minLength" in odcs_property.logicalTypeOptions
+                else None,
+                maxLength=odcs_property.logicalTypeOptions["maxLength"]
+                if odcs_property.logicalTypeOptions is not None and "maxLength" in odcs_property.logicalTypeOptions
+                else None,
+                pattern=odcs_property.logicalTypeOptions["pattern"]
+                if odcs_property.logicalTypeOptions is not None and "pattern" in odcs_property.logicalTypeOptions
+                else None,
+                minimum=odcs_property.logicalTypeOptions["minimum"]
+                if odcs_property.logicalTypeOptions is not None and "minimum" in odcs_property.logicalTypeOptions
+                else None,
+                maximum=odcs_property.logicalTypeOptions["maximum"]
+                if odcs_property.logicalTypeOptions is not None and "maximum" in odcs_property.logicalTypeOptions
+                else None,
             )
             # mapped_type is array
             if field.type == "array" and odcs_property.items is not None:
