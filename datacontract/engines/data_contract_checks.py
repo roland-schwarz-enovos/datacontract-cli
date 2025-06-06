@@ -19,17 +19,26 @@ def create_checks(data_contract_spec: DataContractSpecification, server: Server)
     return [check for check in checks if check is not None]
 
 
-def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
+def to_model_checks_rc(
+    level, super_field_name, fields, model_name, model_value, check_types, quote_field_name, server_type, server: Server
+) -> List[Check]:
     checks: List[Check] = []
-    server_type = server.type if server and server.type else None
-    model_name = to_model_name(model_key, model_value, server_type)
-    fields = model_value.fields
-
-    check_types = is_check_types(server)
-    quote_field_name = server_type in ["postgres", "sqlserver"]
-
-    for field_name, field in fields.items():
-        checks.append(check_field_is_present(model_name, field_name, quote_field_name))
+    server_format = server.format if server.format is not None else ""
+    level = level + 1
+    for _field_name, field in fields.items():
+        ## some kind of dirt to assemble a name through a json object structure.
+        ## Fixme: only for json object structures.
+        field_name: str = _field_name
+        if server_format == "json":
+            if (level - 1) >= 1:  ## and if we are on the initial object level, don't apply any changes.
+                field_name = f"{super_field_name}.{_field_name}"  ## to query inside of json object structures, we need to name the fields in an object-like name pattern, separated by dots.
+            # if ((level-1) == 0):                                                        ## and if we are on the initial object level, don't apply any changes.
+            #    field_name = f"{_field_name}"
+        ## field_is_present may need a different kind of test, as any test on this currently fails.
+        if server_format == "json" and ((level - 1) >= 1):
+            None  ## "nop()"
+        else:
+            checks.append(check_field_is_present(model_name, _field_name, quote_field_name))
         if check_types and field.type is not None:
             sql_type = convert_to_sql_type(field, server_type)
             checks.append(check_field_type(model_name, field_name, sql_type, quote_field_name))
@@ -61,11 +70,43 @@ def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
                 checks.extend(quality_list)
         # TODO references: str = None
         # TODO format
+        ## if something exists in fields, recursive call to itself, store the result and append it to the existing checks.
+        ## Note: Maybe test if serverformat is json, but I have not seen this field populated yet in other formats.
+        if len(field.fields) > 0 and server_format == "json":
+            tmr = to_model_checks_rc(
+                level,
+                field_name,
+                field.fields,
+                model_name,
+                model_value,
+                check_types,
+                quote_field_name,
+                server_type,
+                server,
+            )
+            checks.extend(tmr)
 
-    if model_value.quality is not None and len(model_value.quality) > 0:
-        quality_list = check_quality_list(model_name, None, model_value.quality)
-        if (quality_list is not None) and len(quality_list) > 0:
-            checks.extend(quality_list)
+        if model_value.quality is not None and len(model_value.quality) > 0:
+            quality_list = check_quality_list(model_name, None, model_value.quality)
+            if (quality_list is not None) and len(quality_list) > 0:
+                checks.extend(quality_list)
+
+    return checks
+
+
+def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
+    checks: List[Check] = []
+    server_type = server.type if server and server.type else None
+    model_name = to_model_name(model_key, model_value, server_type)
+    fields = model_value.fields
+
+    check_types = is_check_types(server)
+    quote_field_name = server_type in ["postgres", "sqlserver"]
+
+    rcres = to_model_checks_rc(
+        0, "", fields, model_name, model_value, check_types, quote_field_name, server_type, server
+    )
+    checks.extend(rcres)
 
     return checks
 
@@ -488,6 +529,74 @@ def check_quality_list(model_name, field_name, quality_list: List[Quality]) -> L
                     implementation=yaml.dump(sodacl_check_dict),
                 )
             )
+        ## Note: Still kind of a mess
+        if quality.type == "custom":
+            # translate custom soda code to sodaCL
+            """ - type: custom
+                description: Columns should have values > 0 (0.0)
+                dimension: conformity
+                severity: error
+                businessImpact: operational
+                engine: soda
+                implementation: |
+                    - invalid_count(installed_capacity_neg) = 0:
+                        invalid values: [0.0]
+                    - invalid_count(installed_capacity_pos) = 0:
+                        invalid values: [0.0]"""
+            if field_name is None:
+                check_key = f"{model_name}__quality_custom_{count}"
+                check_type = "field_quality_custom"
+            else:
+                check_key = f"{model_name}__{field_name}__quality_custom_{count}"
+                check_type = "model_quality_custom"
+            ## Fixme: test if everything is present for this type of test.
+            engine = quality.engine
+            sodacl = quality.implementation
+            ## this is some dirt, damn you, unholy yaml string.
+            # ## Fixme: does not work yet as intended.
+            sodacl_check_cl = f"checks for {model_name}\\n{sodacl}"
+            checks.append(
+                Check(
+                    id=str(uuid.uuid4()),
+                    key=check_key,
+                    category="quality",
+                    type=check_type,
+                    name=quality.description if quality.description is not None else "Quality Check",
+                    model=model_name,
+                    field=field_name,
+                    engine=engine,
+                    language="sodacl",
+                    implementation=yaml.dump(sodacl_check_cl),
+                )
+            )
+        if quality.type == "library":
+            if field_name is None:
+                check_key = f"{model_name}__quality_library_{count}"
+                check_type = "field_quality_library"
+            else:
+                check_key = f"{model_name}__{field_name}__quality_library_{count}"
+                check_type = "model_quality_library"
+            # switch between possible check types, translate type to sodaCL
+            library_rule_name = quality.model_extra["rule"] if "rule" in quality.model_extra else ""
+            if library_rule_name == "uniqueCheck":
+                checks.append(
+                    check_field_unique(
+                        model_name, field_name, False
+                    )  ## boolean depends on server_type in ["postgres", "sqlserver"]
+                )
+            if library_rule_name == "nullCheck":
+                checks.append(
+                    check_field_required(
+                        model_name, field_name, False
+                    )  ## depends on     quote_field_name = server_type in ["postgres", "sqlserver"]
+                )
+            # TODO: implement something for this library rule, if it makes sense.
+            # if ( library_rule_name == 'valueCheck'):
+
+            # TODO: implement something for jsonStructure, if it makes sense.
+            # if ( library_rule_name == 'jsonStructure' ):
+            #    raise NotImplementedError("fixme: still to implement this one ")
+
         count += 1
 
     return checks

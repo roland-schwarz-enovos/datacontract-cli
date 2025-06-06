@@ -1,0 +1,44 @@
+dataContractSpecification: 1.1.0
+id: jsonschema-complex-data
+info:
+  title: basic location data
+  version: 1.0.0
+  owner: Checkout Team
+
+models:
+  basedata:
+    type: table
+    fields:
+      id:
+        required: true
+        type: string
+        minLength: 36
+        maxLength: 36
+        pattern: '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
+      location:
+        type: object
+        required: true
+        fields:
+          geo_coordinate:
+            type: object
+            required: true
+            fields:
+              latitude:
+                type: number
+                required: true
+                description: Latitude of the asset location.
+              longitude:
+                type: decimal
+                required: true
+                description: Longitude of the asset location.
+          postal_code:
+            type: string
+            required: true
+            description: Postal code for the location
+
+servers:
+  server:
+    type: local
+    format: json
+    delimiter: array
+    path: "fixtures/local-json-nested/data/sm_data.json"
