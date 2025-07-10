@@ -83,3 +83,10 @@ examples:
             }
         }
       }
+
+servers:
+  server:
+    type: local
+    format: json
+    delimiter: none ##array
+    path: fixtures/local-json-complex/data/sts_data.json

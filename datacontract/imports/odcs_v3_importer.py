@@ -372,6 +372,16 @@ def import_fields(
                         type="object",
                         fields=import_fields(odcs_property.items.properties, custom_type_mappings, server_type),
                     )
+                # array of arrays ?
+                # FIXME: Test missing
+                # NOTE: Figure out how the modeling of a deep nested array of arrays looks.
+                # Opinion, not proven yet: it should be modelled by an import_fields recursive call.
+                elif odcs_property.items.logicalType == "array":
+                    field.items = Field(
+                        type="array",
+                        ## Fixme: array of arrays, howto ?
+                        items=Field(type=odcs_property.items.items.logicalType),
+                    )
                 # array of simple type
                 elif odcs_property.items.logicalType is not None:
                     field.items = Field(type=odcs_property.items.logicalType)

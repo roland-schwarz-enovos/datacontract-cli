@@ -529,6 +529,72 @@ def check_quality_list(model_name, field_name, quality_list: List[Quality]) -> L
                     implementation=yaml.dump(sodacl_check_dict),
                 )
             )
+        ## Note: discussion-point: add a test for the implementation value to take care if the sodacl is valid, or just
+        ## let it crash and burn ?
+        if quality.type == "custom":
+            # translate custom soda code to sodaCL
+            """ ## odcs-format
+              - type: custom
+                description: This column should have values above numeric zero
+                dimension: conformity
+                severity: error
+                businessImpact: operational
+                engine: soda
+                implementation: |
+                    checks for installed_capacity_pos:
+                      - invalid_count(installed_capacity_pos) = 0:
+                        invalid values: [ 0.0 ]
+            """
+            engine = quality.engine
+            sodacl = quality.implementation
+            if field_name is None:
+                check_key = f"{model_name}__quality_custom_{engine}_{count}"
+                check_type = "field_quality_custom"
+            else:
+                check_key = f"{model_name}__{field_name}__quality_custom_{engine}_{count}"
+                check_type = "model_quality_custom"
+            checks.append(
+                Check(
+                    id=str(uuid.uuid4()),
+                    key=check_key,
+                    category="quality",
+                    type=check_type,
+                    name=quality.description if quality.description is not None else "Quality Check",
+                    model=model_name,
+                    field=field_name,
+                    engine=engine,
+                    language="sodacl",
+                    implementation=sodacl,
+                )
+            )
+        if quality.type == "library":
+            if field_name is None:
+                check_key = f"{model_name}__quality_library_{count}"
+                check_type = "field_quality_library"
+            else:
+                check_key = f"{model_name}__{field_name}__quality_library_{count}"
+                check_type = "model_quality_library"
+            # switch between possible check types, translate type to sodaCL
+            library_rule_name = quality.model_extra["rule"] if "rule" in quality.model_extra else ""
+            if library_rule_name == "uniqueCheck":
+                checks.append(
+                    check_field_unique(
+                        model_name, field_name, False
+                    )  ## boolean depends on server_type in ["postgres", "sqlserver"]
+                )
+            if library_rule_name == "nullCheck":
+                checks.append(
+                    check_field_required(
+                        model_name, field_name, False
+                    )  ## depends on     quote_field_name = server_type in ["postgres", "sqlserver"]
+                )
+            # TODO: implement something for this library rule, if it makes sense.
+            # if ( library_rule_name == 'valueCheck'):
+
+            # TODO: implement something for jsonStructure, if it makes sense.
+            # if ( library_rule_name == 'jsonStructure' ):
+            #    raise NotImplementedError("fixme: still to implement this one ")
+
         count += 1
 
     return checks
