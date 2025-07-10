@@ -7,9 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- Use `&#x2007;` instead of `&numsp;` for tab in Markdown export.
+
+## [0.10.29] - 2025-07-06
+
 ### Added
+- Support for Data Contract Specification v1.2.0
+- `datacontract import --format json`: Import from JSON files
 
 ### Changed
+- `datacontract api [OPTIONS]`: Added option to pass extra arguments for `uvicorn.run()`
+
+### Fixed
+- `pytest tests\test_api.py`: Fixed an issue where special characters were not read correctly from file.
+
+## [0.10.28] - 2025-06-05
+
+### Added
+- Much better ODCS support
+    - Import anything to ODCS via the `import --spec odcs` flag
+    - Export to HTML with an ODCS native template via `export --format html`
+    - Export to Mermaid with an ODCS native mapping via `export --format mermaid`
+- The databricks `unity` importer now supports more than a single table. You can use `--unity-table-full-name` multiple times to import multiple tables. And it will automatically add a server with the catalog and schema name.
+
+### Changed
+- `datacontract catalog [OPTIONS]`: Added version to contract cards in `index.html` of the catalog (enabled search by version)
+- The type mapping of the `unity` importer no uses the native databricks types instead of relying on spark types. This allows for better type mapping and more accurate data contracts.
 
 ### Fixed
 

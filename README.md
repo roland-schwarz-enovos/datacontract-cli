@@ -307,30 +307,38 @@ Commands
 │                             [default: datacontract.yaml]                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --schema                                       TEXT     The location (url or path) of the Data   │
-│                                                         Contract Specification JSON Schema       │
-│                                                         [default: None]                          │
-│ --server                                       TEXT     The server configuration to run the      │
-│                                                         schema and quality tests. Use the key of │
-│                                                         the server object in the data contract   │
-│                                                         yaml file to refer to a server, e.g.,    │
-│                                                         `production`, or `all` for all servers   │
-│                                                         (default).                               │
-│                                                         [default: all]                           │
-│ --publish                                      TEXT     The url to publish the results after the │
-│                                                         test                                     │
-│                                                         [default: None]                          │
-│ --output                                       PATH     Specify the file path where the test     │
-│                                                         results should be written to (e.g.,      │
-│                                                         './test-results/TEST-datacontract.xml'). │
-│                                                         [default: None]                          │
-│ --output-format                                [junit]  The target format for the test results.  │
-│                                                         [default: None]                          │
-│ --logs                --no-logs                         Print logs [default: no-logs]            │
-│ --ssl-verification    --no-ssl-verification             SSL verification when publishing the     │
-│                                                         data contract.                           │
-│                                                         [default: ssl-verification]              │
-│ --help                                                  Show this message and exit.              │
+│ --schema                                               TEXT     The location (url or path) of    │
+│                                                                 the Data Contract Specification  │
+│                                                                 JSON Schema                      │
+│                                                                 [default: None]                  │
+│ --server                                               TEXT     The server configuration to run  │
+│                                                                 the schema and quality tests.    │
+│                                                                 Use the key of the server object │
+│                                                                 in the data contract yaml file   │
+│                                                                 to refer to a server, e.g.,      │
+│                                                                 `production`, or `all` for all   │
+│                                                                 servers (default).               │
+│                                                                 [default: all]                   │
+│ --publish-test-results    --no-publish-test-results             Publish the results after the    │
+│                                                                 test                             │
+│                                                                 [default:                        │
+│                                                                 no-publish-test-results]         │
+│ --publish                                              TEXT     DEPRECATED. The url to publish   │
+│                                                                 the results after the test.      │
+│                                                                 [default: None]                  │
+│ --output                                               PATH     Specify the file path where the  │
+│                                                                 test results should be written   │
+│                                                                 to (e.g.,                        │
+│                                                                 './test-results/TEST-datacontra… │
+│                                                                 [default: None]                  │
+│ --output-format                                        [junit]  The target format for the test   │
+│                                                                 results.                         │
+│                                                                 [default: None]                  │
+│ --logs                    --no-logs                             Print logs [default: no-logs]    │
+│ --ssl-verification        --no-ssl-verification                 SSL verification when publishing │
+│                                                                 the data contract.               │
+│                                                                 [default: ssl-verification]      │
+│ --help                                                          Show this message and exit.      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 ```
@@ -1184,9 +1192,9 @@ FROM
                                                                                                     
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
 │ *  --format                       [sql|avro|dbt|dbml|glue|jsonsc  The format of the source file. │
-│                                   hema|bigquery|odcs|unity|spark  [default: None]                │
-│                                   |iceberg|parquet|csv|protobuf|  [required]                     │
-│                                   excel]                                                         │
+│                                   hema|json|bigquery|odcs|unity|  [default: None]                │
+│                                   spark|iceberg|parquet|csv|prot  [required]                     │
+│                                   obuf|excel]                                                    │
 │    --output                       PATH                            Specify the file path where    │
 │                                                                   the Data Contract will be      │
 │                                                                   saved. If no path is provided, │
@@ -1196,6 +1204,10 @@ FROM
 │    --source                       TEXT                            The path to the file that      │
 │                                                                   should be imported.            │
 │                                                                   [default: None]                │
+│    --spec                         [datacontract_specification|od  The format of the data         │
+│                                   cs]                             contract to import.            │
+│                                                                   [default:                      │
+│                                                                   datacontract_specification]    │
 │    --dialect                      TEXT                            The SQL dialect to use when    │
 │                                                                   importing SQL files, e.g.,     │
 │                                                                   postgres, tsql, bigquery.      │
@@ -1606,6 +1618,8 @@ datacontract catalog --files "*.odcs.yaml"
  information.                                                                                       
  To connect to servers (such as a Snowflake data source), set the credentials as environment        
  variables as documented in https://cli.datacontract.com/#test                                      
+ It is possible to run the API with extra arguments for `uvicorn.run()` as keyword arguments, e.g.: 
+ `datacontract api --port 1234 --root_path /datacontract`.                                          
                                                                                                     
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
 │ --port        INTEGER  Bind socket to this port. [default: 4242]                                 │
@@ -1872,7 +1886,7 @@ if __name__ == "__main__":
 Output
 
 ```yaml
-dataContractSpecification: 1.1.0
+dataContractSpecification: 1.2.0
 id: uuid-custom
 info:
   title: my_custom_imported_data
@@ -1891,22 +1905,9 @@ models:
 ```
 ## Development Setup
 
-Python base interpreter should be 3.11.x (unless working on 3.12 release candidate).
-
-```bash
-# create venv
-python3.11 -m venv venv
-source venv/bin/activate
-
-# Install Requirements
-pip install --upgrade pip setuptools wheel
-pip install -e '.[dev]'
-pre-commit install
-pre-commit run --all-files
-pytest
-```
-
-### Use uv (recommended)
+- Install [uv](https://docs.astral.sh/uv/)
+- Python base interpreter should be 3.11.x .
+- Docker engine must be running to execute the tests.
 
 ```bash
 # make sure uv is installed
@@ -1988,6 +1989,7 @@ We are happy to receive your contributions. Propose your change in an issue or d
 - [INNOQ](https://innoq.com)
 - [Data Catering](https://data.catering/)
 - [Oliver Wyman](https://www.oliverwyman.com/)
+- [dmTECH](https://www.dmtech.tech/de)
 - And many more. To add your company, please create a pull request.
 
 ## Related Tools
