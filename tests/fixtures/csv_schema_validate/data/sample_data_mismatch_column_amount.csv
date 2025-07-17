@@ -1,5 +1,5 @@
 
-Current day,Hour 1,Hour 2,Hour 3A,Hour 3B,Hour 4,Middle-Night,Morning,Afternoon,Evening,Sunpeak,Sunlow
+CurrentDay,Hour_1,Hour_2,Hour_3,Hour_4,MiddleNight,Morning,Afternoon,Evening,Sunpeak,Sunlow
 04/06/2025,45.99,67.25,64.78,,65.00,68.32,80.32,99.77,113.74,112.40
 03/06/2025,111.49,109.91,102.02,,99.23,94.89,107.60,130.76,116.85,85.98
 02/06/2025,81.76,75.31,75.00,,77.75,83.05,91.93,108.15,117.90,102.36

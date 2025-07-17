@@ -29,30 +29,27 @@ schema:
     physicalName: dayahead_prices
     dataGranularityDescription: Hourly energy prices
     properties:
-      - name: Current day
+      - name: CurrentDay
         logicalType: date
         physicalType: DATE
         required: true
-      - name: Hour 1        ## note: some part of the yaml syntax/soda translation does not allow spaces in table names.
+      - name: Hour_1        ## note: some part of the yaml syntax/soda translation does not allow spaces in table names.
         logicalType: number
         physicalType: decimal
         required: true
-      - name: Hour 2
+      - name: Hour_2
         logicalType: number
         physicalType: decimal
         required: true
-      - name: Hour 3A
+      - name: Hour_3
         logicalType: number
         physicalType: decimal
         required: true
-      - name: Hour 3B       ## only for the one hour plus of the dst-reset, so this one exists on one day.
-        logicalType: number
-        physicalType: decimal
-      - name: Hour 4
+      - name: Hour_4
         logicalType: number
         physicalType: decimal
         required: true
-      - name: Middle-Night
+      - name: 'MiddleNight'
         logicalType: number
         physicalType: decimal
         required: true
