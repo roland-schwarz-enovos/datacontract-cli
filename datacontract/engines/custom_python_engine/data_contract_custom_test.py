@@ -46,7 +46,10 @@ def discover_plugins(dirs):
 
             modname, ext = os.path.splitext(filename)
             if ext == ".py":
+                ## old variant, imp doesn't exist any loinger
                 file, path, descr = imp.find_module(modname, [dir])
+                # modspec =  importlib.util.find_spec(modname, [dir])
+                ##file, path, descr =
                 if file:
                     # Loading the module registers the plugin in
                     # "PluginRegistry"
@@ -67,6 +70,18 @@ def check_custom_python_engine_execute(
 
     if data_contract is None:
         run.log_warn("Cannot run custom python engine, as data contract is invalid.")
+        return
+
+    ## get the custom plugin folder stored in   DATACONTRACT_CUSTOMPLUGIN_FOLDER
+    basefolderByMasterconfig: str = ""
+    try:
+        basefolderByMasterconfig = os.environ["DATACONTRACT_CUSTOMPLUGIN_FOLDER"]
+    except Exception:
+        ## no plugins configured, you can return
+        ## Without a custom plugin folder there a no custom tests.
+        run.log_warn(
+            "Cannot run custom python engine, as no plugin folder is configured. Check for environment var 'DATACONTRACT_CUSTOMPLUGIN_FOLDER'. "
+        )
         return
 
     run.log_info("Running engine 'custom_python_engine'")
@@ -102,12 +117,10 @@ def check_custom_python_engine_execute(
         duckdb_connection = NewDuckdbConnection
 
     ## Fixme: dirt. Configure this through environment or some other way.
-    tmp_base_folder = (
-        "/home/roland.schwarz/projects/DataQuality/dataqualityroutines/dataqualitytester/DataContract_PluginFolder"
-    )
-    knownDQPluginsList = discover_plugins([tmp_base_folder])
-    # Filter out the needed plugin defined in the engine implementation
-    # Contract specs.
+    searchfolders: list[str] = [basefolderByMasterconfig]
+    knownDQPluginsList = discover_plugins(searchfolders)
+
+    # pattern of the definition
     # - type: custom
     #    description: Test that the difference between columnA(row=1) and columnB(row=1) is in a specific time range.
     # (..)
