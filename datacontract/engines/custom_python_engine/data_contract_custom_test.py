@@ -7,7 +7,6 @@ check.implementation
 
 """
 
-import imp
 import os
 import typing
 
@@ -46,14 +45,23 @@ def discover_plugins(dirs):
 
             modname, ext = os.path.splitext(filename)
             if ext == ".py":
-                ## old variant, imp doesn't exist any loinger
-                file, path, descr = imp.find_module(modname, [dir])
-                # modspec =  importlib.util.find_spec(modname, [dir])
-                ##file, path, descr =
-                if file:
-                    # Loading the module registers the plugin in
-                    # "PluginRegistry"
-                    imp.load_module(modname, file, path, descr)
+                import sys
+
+                if sys.version_info[0] == 3:
+                    if sys.version_info[1] >= 5:
+                        import importlib.util
+
+                        spec = importlib.util.spec_from_file_location(modname, testpath)
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                    elif sys.version_info[1] < 5:
+                        import importlib.machinery
+
+                        loader = importlib.machinery.SourceFileLoader(modname, testpath)
+                        loader.load_module()
+                elif sys.version_info[0] == 2:
+                    raise NotImplementedError("Not implemented for pyhton version below 3.")
+
     return DataQualityPluginRegistry.plugins
 
 
