@@ -238,7 +238,7 @@ models:
                     ApplicableBranchIDs:
                       type: array
                       required: false
-                      items: 
+                      items:
                         type: string
                     ProductGroupDetails:
                       type: record
@@ -294,7 +294,7 @@ models:
       processed_timestamp:
         type: long
         required: true
-        description: 'The date the event was processed: for more info https://avro.apache.org/docs/current/spec.html#Local+timestamp+%28microsecond+precision%29'        
+        description: 'The date the event was processed: for more info https://avro.apache.org/docs/current/spec.html#Local+timestamp+%28microsecond+precision%29'
         config:
           avroLogicalType: local-timestamp-micros
       description:
@@ -304,12 +304,50 @@ models:
         type: boolean
         required: true
         config:
-          avroDefault: false 
+          avroDefault: false
       some_bytes_decimal:
         type: decimal
         required: true
         precision: 25
-        scale: 2                                
+        scale: 2
+"""
+    print("Result:\n", result.to_yaml())
+    assert yaml.safe_load(result.to_yaml()) == yaml.safe_load(expected)
+    assert DataContract(data_contract_str=expected).lint(enabled_linters="none").has_passed()
+
+
+def test_import_avro_optional_enum():
+    result = DataContract().import_from_source("avro", "fixtures/avro/data/optional_enum.avsc")
+
+    expected = """
+dataContractSpecification: 1.2.0
+id: my-data-contract-id
+info:
+  title: My Data Contract
+  version: 0.0.1
+models:
+  TestRecord:
+    fields:
+      required_enum:
+        title: Color
+        type: string
+        required: true
+        enum:
+        - RED
+        - GREEN
+        - BLUE
+        config:
+          avroType: enum
+      optional_enum:
+        title: Status
+        type: string
+        required: false
+        enum:
+        - ACTIVE
+        - INACTIVE
+        - PENDING
+        config:
+          avroType: enum
 """
     print("Result:\n", result.to_yaml())
     assert yaml.safe_load(result.to_yaml()) == yaml.safe_load(expected)

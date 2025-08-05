@@ -1,5 +1,9 @@
+import atexit
+import os
+import tempfile
 import typing
 
+import requests
 from duckdb.duckdb import DuckDBPyConnection
 
 from datacontract.engines.data_contract_checks import create_checks
@@ -48,6 +52,9 @@ def execute_data_contract_test(
     run.outputPortId = server.outputPortId
     run.server = server_name
 
+    if server.type == "api":
+        server = process_api_response(run, server)
+
     run.checks.extend(create_checks(data_contract_specification, server))
 
     # TODO check server is supported type for nicer error messages
@@ -60,6 +67,7 @@ def execute_data_contract_test(
         check_csvschema.check_csvschema(run, data_contract_specification, server)
 
     check_soda_execute(run, data_contract_specification, server, spark, duckdb_connection)
+
     ## Custom engine for additional checks. History: There was a need to run customized checks on more complex json data.
     check_custom_python_engine_execute(run, data_contract_specification, server, spark, duckdb_connection)
 
@@ -82,4 +90,34 @@ def get_server(data_contract_specification: DataContractSpecification, server_na
     else:
         server_name = list(data_contract_specification.servers.keys())[0]
         server = data_contract_specification.servers.get(server_name)
+    return server
+
+
+def process_api_response(run, server):
+    tmp_dir = tempfile.TemporaryDirectory(prefix="datacontract_cli_api_")
+    atexit.register(tmp_dir.cleanup)
+    headers = {}
+    if os.getenv("DATACONTRACT_API_HEADER_AUTHORIZATION") is not None:
+        headers["Authorization"] = os.getenv("DATACONTRACT_API_HEADER_AUTHORIZATION")
+    try:
+        response = requests.get(server.location, headers=headers)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise DataContractException(
+            type="connection",
+            name="API server connection error",
+            result=ResultEnum.error,
+            reason=f"Failed to fetch API response from {server.location}: {e}",
+            engine="datacontract",
+        )
+    with open(f"{tmp_dir.name}/api_response.json", "w") as f:
+        f.write(response.text)
+    run.log_info(f"Saved API response to {tmp_dir.name}/api_response.json")
+    server = Server(
+        type="local",
+        format="json",
+        path=f"{tmp_dir.name}/api_response.json",
+        dataProductId=server.dataProductId,
+        outputPortId=server.outputPortId,
+    )
     return server
