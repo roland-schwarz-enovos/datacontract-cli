@@ -330,3 +330,4 @@ fabric.properties
 # Generated test files
 **/.tmp
 /.claude/settings.local.json
+datacontract/engines/datacontract-cli-enovos-fork.code-workspace
