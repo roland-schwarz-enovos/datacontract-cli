@@ -11,6 +11,9 @@ from datacontract.engines.data_contract_checks import create_checks
 if typing.TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
+from datacontract.engines.csvschema import check_csvschema
+from datacontract.engines.custom_python_engine.data_contract_custom_test import check_custom_python_engine_execute
+
 from datacontract.engines.datacontract.check_that_datacontract_contains_valid_servers_configuration import (
     check_that_datacontract_contains_valid_server_configuration,
 )
@@ -59,6 +62,9 @@ def execute_data_contract_test(
     # TODO check server credentials are complete for nicer error messages
     if server.format == "json" and server.type != "kafka":
         check_jsonschema(run, data_contract_specification, server)
+    # TODO: check if some change to the test flow control should be applied if basic validation fails.
+    if server.format == "csv" and server.type != "kafka":
+        check_csvschema.check_csvschema(run, data_contract_specification, server)
     check_soda_execute(run, data_contract_specification, server, spark, duckdb_connection)
 
 
