@@ -1,0 +1,22 @@
+[
+{
+    "id": "42a17d0f-dab9-40d4-92a1-ac460d7ce5d1",
+    "location": {
+        "geo_coordinate": {
+            "latitude": 22.334455,
+            "longitude": 0.03802
+        },
+        "postal_code": "D-85214"
+    }
+},
+{
+    "id": "070a4a55-78b2-4e22-b5d7-416faddd3af6",
+    "location": {
+        "geo_coordinate": {
+            "latitude": 98.7654,
+            "longitude": 1.2345
+        },
+        "postal_code": "D-65482"
+    }
+}
+]

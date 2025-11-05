@@ -43,9 +43,31 @@ def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
         quote_model_name_with_backticks=type1 == "bigquery",
     )
     quoting_config = config
+    rcres = to_model_checks_rc(0, "", fields, model_name, model_value, check_types, quoting_config, server_type, server)
+    checks.extend(rcres)
+    return checks
 
-    for field_name, field in fields.items():
-        checks.append(check_field_is_present(model_name, field_name, quoting_config))
+def to_model_checks_rc(
+    level, super_field_name, fields, model_name, model_value, check_types, quoting_config, server_type, server: Server ) -> List[Check]:
+    checks: List[Check] = []
+    server_format = server.format if server.format is not None else ""
+    level = level + 1
+
+    for _field_name, field in fields.items():
+        # Explanation: This addon is for json structures with nested structures. It modifies the field name to allow duckdb to query for a field name
+        # with SQL. If the server_format equals json, the fieldname is build up with the field names from the recursive call structure build up
+        # by the calls through those two functions.
+        # to query inside of json object structures, we need to name the fields in an object-like name pattern, separated by dots. This is done here.
+        field_name: str = _field_name
+        if server_format == "json":
+            if (level - 1) >= 1:  # If we are on the initial object level, don't apply any changes.
+                field_name = f"{super_field_name}.{_field_name}"
+
+        # FIXME: Fix the logic to avoid this empty if expression
+        if server_format == "json" and ((level - 1) >= 1):
+            None  ## "nop()"
+        else:
+            checks.append(check_field_is_present(model_name, field_name, quoting_config))
         if check_types and field.type is not None:
             sql_type: str = convert_to_sql_type(field, server_type)
             checks.append(check_field_type(model_name, field_name, sql_type, quoting_config))
@@ -68,6 +90,7 @@ def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
             checks.append(check_field_maximum(model_name, field_name, field.exclusiveMaximum, quoting_config))
             checks.append(check_field_not_equal(model_name, field_name, field.exclusiveMaximum, quoting_config))
         if field.pattern is not None:
+            print ("93 :: pattern create check entered.")
             checks.append(check_field_regex(model_name, field_name, field.pattern, quoting_config))
         if field.enum is not None and len(field.enum) > 0:
             checks.append(check_field_enum(model_name, field_name, field.enum, quoting_config))
@@ -77,6 +100,20 @@ def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
                 checks.extend(quality_list)
         # TODO references: str = None
         # TODO format
+        # Addon to identify the need for a recursive call for json structures, append it to the existing checks.
+        if len(field.fields) > 0 and server_format == "json":
+            tmr = to_model_checks_rc(
+                level,
+                field_name,
+                field.fields,
+                model_name,
+                model_value,
+                check_types,
+                quoting_config,
+                server_type,
+                server,
+            )
+            checks.extend(tmr)
 
     if model_value.quality is not None and len(model_value.quality) > 0:
         quality_list = check_quality_list(model_name, None, model_value.quality)
