@@ -386,11 +386,45 @@ def import_field(
         else {},
         config=import_field_config(odcs_property, server_type),
         format=getattr(odcs_property, "format", None),
+        ## RS addon. FIXME: Test for tests
+        pattern=getattr(odcs_property, "pattern", None),
+        minLength=odcs_property.logicalTypeOptions['minLength'] if odcs_property.logicalTypeOptions is not None and 'minLength' in odcs_property.logicalTypeOptions else None,
+        maxLength=odcs_property.logicalTypeOptions['maxLength'] if odcs_property.logicalTypeOptions is not None and 'maxLength' in odcs_property.logicalTypeOptions else None,
+        minimum=odcs_property.logicalTypeOptions['minimum'] if odcs_property.logicalTypeOptions is not None and 'minimum' in odcs_property.logicalTypeOptions else None,
+        maximum=odcs_property.logicalTypeOptions['maximum'] if odcs_property.logicalTypeOptions is not None and 'maximum' in odcs_property.logicalTypeOptions else None,
     )
-
+    #FIXME: Is this syntactically correct, do tests exist.
+    # set format if it is null and some format data is present in the logicalTypeOptions
+    if field.format is None and odcs_property.logicalTypeOptions is not None and 'format' in odcs_property.logicalTypeOptions:
+        field.format = odcs_property.logicalTypeOptions['format']
+    # set pattern if it is null and some pattern data is present in the logicalTypeOptions
+    if field.pattern is None and odcs_property.logicalTypeOptions is not None and 'pattern' in odcs_property.logicalTypeOptions:
+        field.pattern=odcs_property.logicalTypeOptions['pattern']
     # mapped_type is array
     if field.type == "array" and odcs_property.items is not None:
         field.items = import_field(odcs_property.items, [], custom_type_mappings, server_type)
+
+    """
+old code, kept for debugging.
+            if field.type == "array" and odcs_property.items is not None:
+                # nested array object
+                if odcs_property.items.logicalType == "object":
+                    field.items = Field(
+                        type="object",
+                        fields=import_fields(odcs_property.items.properties, custom_type_mappings, server_type),
+                    )
+                ## array of arrays ?
+                if odcs_property.items.logicalType == "array":
+                    field.items = Field(
+                        type="array",
+                        ## Fixme: array of arrays, howto ?
+                        items=Field(type=odcs_property.items.items.logicalType)
+                    )
+                # array of simple type
+                elif odcs_property.items.logicalType is not None:
+                    field.items = Field(type=odcs_property.items.logicalType)
+
+    """
 
     # enum from quality validValues as enum
     if field.type == "string":
