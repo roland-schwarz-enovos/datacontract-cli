@@ -16,6 +16,7 @@ class QuotingConfig:
     quote_field_name: bool = False
     quote_model_name: bool = False
     quote_model_name_with_backticks: bool = False
+    rewrite_csv_columnnames: bool = False
 
 
 def create_checks(data_contract_spec: DataContractSpecification, server: Server) -> List[Check]:
@@ -35,12 +36,12 @@ def to_model_checks(model_key, model_value, server: Server) -> List[Check]:
     fields = model_value.fields
 
     check_types = is_check_types(server)
-
-    type1 = server.type if server and server.type else None
+    type1       = server.type if server and server.type else None
     config = QuotingConfig(
         quote_field_name=type1 in ["postgres", "sqlserver"],
         quote_model_name=type1 in ["postgres", "sqlserver"],
         quote_model_name_with_backticks=type1 == "bigquery",
+        rewrite_csv_columnnames=False
     )
     quoting_config = config
     rcres = to_model_checks_rc(0, "", fields, model_name, model_value, check_types, quoting_config, server_type, server)
@@ -62,12 +63,14 @@ def to_model_checks_rc(
         if server_format == "json":
             if (level - 1) >= 1:  # If we are on the initial object level, don't apply any changes.
                 field_name = f"{super_field_name}.{_field_name}"
-
+        if server_format == "csv" and (not field_name.isalnum()):
+            quoting_config.rewrite_csv_columnnames    = True
+##            quoting_config['rewrite_csv_columnnames'] = True
         # FIXME: Fix the logic to avoid this empty if expression
         if server_format == "json" and ((level - 1) >= 1):
             None  ## "nop()"
         else:
-            checks.append(check_field_is_present(model_name, field_name, quoting_config))
+            checks.append(check_field_is_present(model_name, field_name, quoting_config))   ## FIXME: review if the field_name used is correct.
         if check_types and field.type is not None:
             sql_type: str = convert_to_sql_type(field, server_type)
             checks.append(check_field_type(model_name, field_name, sql_type, quoting_config))
@@ -154,6 +157,10 @@ def to_model_name(model_key, model_value, server_type):
 
 
 def check_field_is_present(model_name, field_name, quoting_config: QuotingConfig = QuotingConfig()) -> Check:
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     check_type = "field_is_present"
     check_key = f"{model_name}__{field_name}__{check_type}"
     sodacl_check_dict = {
@@ -176,6 +183,7 @@ def check_field_is_present(model_name, field_name, quoting_config: QuotingConfig
         name=f"Check that field '{field_name}' is present",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -185,6 +193,10 @@ def check_field_is_present(model_name, field_name, quoting_config: QuotingConfig
 def check_field_type(
     model_name: str, field_name: str, expected_type: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     check_type = "field_type"
     check_key = f"{model_name}__{field_name}__{check_type}"
     sodacl_check_dict = {
@@ -209,6 +221,7 @@ def check_field_type(
         name=f"Check that field {field_name} has type {expected_type}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -216,6 +229,11 @@ def check_field_type(
 
 
 def check_field_required(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -240,6 +258,7 @@ def check_field_required(model_name: str, field_name: str, quoting_config: Quoti
         name=f"Check that field {field_name} has no missing values",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -247,6 +266,11 @@ def check_field_required(model_name: str, field_name: str, quoting_config: Quoti
 
 
 def check_field_unique(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -271,6 +295,7 @@ def check_field_unique(model_name: str, field_name: str, quoting_config: Quoting
         name=f"Check that unique field {field_name} has no duplicate values",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -280,6 +305,11 @@ def check_field_unique(model_name: str, field_name: str, quoting_config: Quoting
 def check_field_min_length(
     model_name: str, field_name: str, min_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -305,6 +335,7 @@ def check_field_min_length(
         name=f"Check that field {field_name} has a min length of {min_length}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -314,6 +345,11 @@ def check_field_min_length(
 def check_field_max_length(
     model_name: str, field_name: str, max_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -339,6 +375,7 @@ def check_field_max_length(
         name=f"Check that field {field_name} has a max length of {max_length}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -348,10 +385,16 @@ def check_field_max_length(
 def check_field_minimum(
     model_name: str, field_name: str, minimum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
         field_name_for_soda = field_name
+
 
     check_type = "field_minimum"
     check_key = f"{model_name}__{field_name}__{check_type}"
@@ -373,6 +416,7 @@ def check_field_minimum(
         name=f"Check that field {field_name} has a minimum of {minimum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -382,6 +426,11 @@ def check_field_minimum(
 def check_field_maximum(
     model_name: str, field_name: str, maximum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -407,6 +456,7 @@ def check_field_maximum(
         name=f"Check that field {field_name} has a maximum of {maximum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -416,6 +466,11 @@ def check_field_maximum(
 def check_field_not_equal(
     model_name: str, field_name: str, value: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -441,6 +496,7 @@ def check_field_not_equal(
         name=f"Check that field {field_name} is not equal to {value}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -448,6 +504,11 @@ def check_field_not_equal(
 
 
 def check_field_enum(model_name: str, field_name: str, enum: list, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -473,6 +534,7 @@ def check_field_enum(model_name: str, field_name: str, enum: list, quoting_confi
         name=f"Check that field {field_name} only contains enum values {enum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -480,6 +542,11 @@ def check_field_enum(model_name: str, field_name: str, enum: list, quoting_confi
 
 
 def check_field_regex(model_name: str, field_name: str, pattern: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -505,6 +572,7 @@ def check_field_regex(model_name: str, field_name: str, pattern: str, quoting_co
         name=f"Check that field {field_name} matches regex pattern {pattern}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -565,6 +633,11 @@ def check_model_duplicate_values(
 def check_field_duplicate_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -589,6 +662,7 @@ def check_field_duplicate_values(
         name=f"Check that field {field_name} has duplicate_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -598,6 +672,11 @@ def check_field_duplicate_values(
 def check_field_null_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -622,6 +701,7 @@ def check_field_null_values(
         name=f"Check that field {field_name} has missing_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -635,6 +715,11 @@ def check_field_invalid_values(
     valid_values: list = None,
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -665,6 +750,7 @@ def check_field_invalid_values(
         name=f"Check that field {field_name} has invalid_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -678,6 +764,11 @@ def check_field_missing_values(
     missing_values: list = None,
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -711,6 +802,7 @@ def check_field_missing_values(
         name=f"Check that field {field_name} has missing_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -720,6 +812,11 @@ def check_field_missing_values(
 def check_quality_list(
     model_name, field_name, quality_list: List[Quality], quoting_config: QuotingConfig = QuotingConfig()
 ) -> List[Check]:
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames == True:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     checks: List[Check] = []
 
     count = 0
@@ -763,6 +860,7 @@ def check_quality_list(
                     name=quality.description if quality.description is not None else "Quality Check",
                     model=model_name,
                     field=field_name,
+                    fieldname_original=field_name_orig,
                     engine="soda",
                     language="sodacl",
                     implementation=yaml.dump(sodacl_check_dict),
@@ -1076,3 +1174,86 @@ def to_quality_check(data_contract_spec) -> Check | None:
         language="sodacl",
         implementation=yaml.dump(quality_specification),
     )
+
+## Borrowed from duckdb "normalize".
+def NormalizeColumnName( col_name : str) -> str:
+    ncol_name:      str = ''
+    col_name_index: int = 0
+    for item in col_name:
+        if (item == '_' or (item >= '0' and item <= '9') or (item >= 'A' and item <= 'Z') or (item >= 'a' and item <= 'z')) :
+            ncol_name = f"{ncol_name}{item}"
+        elif item.isspace():
+            ncol_name = f"{ncol_name} "
+
+    col_name_trimmed: str = ncol_name.strip()
+    col_name_cleaned: str = ""
+    in_whitespace:   bool = False
+    for character in col_name_trimmed:
+        if character == ' ':
+            if ( not in_whitespace ):
+                col_name_cleaned = f"{col_name_cleaned}_"
+                in_whitespace = True
+        else:
+            col_name_cleaned =  f"{col_name_cleaned}{character}"
+            in_whitespace = False
+
+    ##// don't leave string empty; if not empty, make lowercase
+    if len(col_name_cleaned) == 0:
+        col_name_cleaned = "_"
+    else:
+        col_name_cleaned = col_name_cleaned.lower()
+
+    return col_name_cleaned
+
+""" normalize_function from duckdb
+static string NormalizeColumnName(const string &col_name) {
+	// normalize UTF8 characters to NFKD
+	auto nfkd = utf8proc_NFKD(reinterpret_cast<const utf8proc_uint8_t *>(col_name.c_str()),
+	                          NumericCast<utf8proc_ssize_t>(col_name.size()));
+	const string col_name_nfkd = string(const_char_ptr_cast(nfkd), strlen(const_char_ptr_cast(nfkd)));
+	free(nfkd);
+
+	// only keep ASCII characters 0-9 a-z A-Z and replace spaces with regular whitespace
+	string col_name_ascii = "";
+	for (idx_t i = 0; i < col_name_nfkd.size(); i++) {
+		if (col_name_nfkd[i] == '_' || (col_name_nfkd[i] >= '0' && col_name_nfkd[i] <= '9') ||
+		    (col_name_nfkd[i] >= 'A' && col_name_nfkd[i] <= 'Z') ||
+		    (col_name_nfkd[i] >= 'a' && col_name_nfkd[i] <= 'z')) {
+			col_name_ascii += col_name_nfkd[i];
+		} else if (StringUtil::CharacterIsSpace(col_name_nfkd[i])) {
+			col_name_ascii += " ";
+		}
+	}
+
+	// trim whitespace and replace remaining whitespace by _
+	string col_name_trimmed = TrimWhitespace(col_name_ascii);
+	string col_name_cleaned = "";
+	bool in_whitespace = false;
+	for (idx_t i = 0; i < col_name_trimmed.size(); i++) {
+		if (col_name_trimmed[i] == ' ') {
+			if (!in_whitespace) {
+				col_name_cleaned += "_";
+				in_whitespace = true;
+			}
+		} else {
+			col_name_cleaned += col_name_trimmed[i];
+			in_whitespace = false;
+		}
+	}
+
+	// don't leave string empty; if not empty, make lowercase
+	if (col_name_cleaned.empty()) {
+		col_name_cleaned = "_";
+	} else {
+		col_name_cleaned = StringUtil::Lower(col_name_cleaned);
+	}
+
+	// prepend _ if name starts with a digit or is a reserved keyword
+	auto keyword = KeywordHelper::KeywordCategoryType(col_name_cleaned);
+
+	if (NormalizeThis(keyword, col_name_cleaned) || (col_name_cleaned[0] >= '0' && col_name_cleaned[0] <= '9')) {
+		col_name_cleaned = "_" + col_name_cleaned;
+	}
+	return col_name_cleaned;
+}
+"""

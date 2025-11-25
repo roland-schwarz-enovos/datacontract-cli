@@ -24,6 +24,7 @@ class Check(BaseModel):
     name: str | None = None
     model: str | None = None
     field: str | None = None
+    fieldname_original: str | None = None           ##RS: in case of normalizing the field name within CSV-Inputs, we store the original name for easier identification.
 
     engine: str | None = None
     language: str | None = None

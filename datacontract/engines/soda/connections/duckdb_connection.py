@@ -7,6 +7,21 @@ from datacontract.export.duckdb_type_converter import convert_to_duckdb_csv_type
 from datacontract.model.data_contract_specification import DataContractSpecification, Field, Model, Server
 from datacontract.model.run import Run
 
+## This one looks into the model, if input is csv, to determine if there are field names in the file that contain spaces or any other shenanigans
+## and then applies the field_normalization while reading the source.
+def determine_if_normalize_is_needed(
+    data_contract: DataContractSpecification,
+    ) -> bool:
+        for mi in data_contract.models.items():
+            for fi in mi:
+                if isinstance(fi, Model):
+                    print(fi)
+                    for sfi in fi.fields:
+                        ## now test for thingies to normalize.
+                        if not sfi.isalnum():
+                            # print(f"{sfi} is not pure alphanum, clensing comitted...")
+                            return True
+        return False
 
 def get_duckdb_connection(
     data_contract: DataContractSpecification,
@@ -58,16 +73,27 @@ def get_duckdb_connection(
                         CREATE VIEW "{model_name}" AS SELECT * FROM read_parquet('{model_path}', hive_partitioning=1);
                         """)
         elif server.format == "csv":
+            normres:bool            = determine_if_normalize_is_needed(data_contract)
+            normalize_names: str    = "{}".format(normres)
             columns = to_csv_types(model)
             run.log_info("Using columns: " + str(columns))
             if columns is None:
                 con.sql(
-                    f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', hive_partitioning=1);"""
+                    f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', normalize_names = {normalize_names}, hive_partitioning=1);"""
                 )
             else:
-                con.sql(
-                    f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', hive_partitioning=1, columns={columns});"""
-                )
+                from duckdb import InvalidInputException
+                try:
+                    con.sql(
+                        f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', normalize_names = {normalize_names}, hive_partitioning=1, columns={columns});"""
+                    )
+                except InvalidInputException as inex:
+                    run.log_info(f"duckdb_connection.py:68 - open file failed with: {str(inex)}")
+                    run.log_info( "Trying without column definition.")
+                    columns = None
+                    con.sql(
+                       f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', normalize_names = {normalize_names}, hive_partitioning=1);"""
+                    )
         elif server.format == "delta":
             con.sql("update extensions;")  # Make sure we have the latest delta extension
             con.sql(f"""CREATE VIEW "{model_name}" AS SELECT * FROM delta_scan('{model_path}');""")
