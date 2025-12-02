@@ -1,4 +1,4 @@
-from datacontract.engines.data_contract_checks import QuotingConfig, period_to_seconds, prepare_query
+from datacontract.engines.data_contract_checks import QuotingConfig, period_to_seconds, prepare_query, NormalizeColumnName
 from datacontract.model.data_contract_specification import Quality, Server
 
 
@@ -80,3 +80,11 @@ def test_period_to_seconds():
     assert period_to_seconds("1d") == 86400
     assert period_to_seconds("24h") == 86400
     assert period_to_seconds("60m") == 3600
+
+def testNormalizeColumnName():
+    raise NotImplementedError("test muss noch gebaut werden.")
+    TestMap = {'Test 1':'test_1','T E S T 2!':'t_e_s_t_2'}
+    for source, transtarget in TestMap:
+
+        rvx:str = NormalizeColumnName(source)
+        assert rvx == transtarget
