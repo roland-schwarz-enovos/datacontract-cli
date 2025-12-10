@@ -12,6 +12,8 @@ if typing.TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 from datacontract.engines.csvschema import check_csvschema
+from datacontract.engines.custom_python_engine.data_contract_custom_test import check_custom_python_engine_execute
+
 from datacontract.engines.datacontract.check_that_datacontract_contains_valid_servers_configuration import (
     check_that_datacontract_contains_valid_server_configuration,
 )
@@ -64,6 +66,9 @@ def execute_data_contract_test(
     if server.format == "csv" and server.type != "kafka":
         check_csvschema.check_csvschema(run, data_contract_specification, server)
     check_soda_execute(run, data_contract_specification, server, spark, duckdb_connection)
+
+    ## Custom engine for additional checks. History: There was a need to run customized checks on more complex json data.
+    check_custom_python_engine_execute(run, data_contract_specification, server, spark, duckdb_connection)
 
 
 def get_server(data_contract_specification: DataContractSpecification, server_name: str = None) -> Server | None:
