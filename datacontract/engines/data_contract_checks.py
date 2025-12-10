@@ -1222,8 +1222,148 @@ def NormalizeColumnName( col_name : str) -> str:
         col_name_cleaned = "_"
     else:
         col_name_cleaned = col_name_cleaned.lower()
+    ##    (col_name_cleaned[0] >= '0' && col_name_cleaned[0] <= '9'))
+
+    if col_name_cleaned[0] >=  '0' and col_name_cleaned[0] <= '9':
+        ## nah....
+        col_name_cleaned[0] = '_'
 
     return col_name_cleaned
+
+"""
+
+// Populating colname_keyword_map
+	colname_keyword_map.insert("between");
+	colname_keyword_map.insert("bigint");
+	colname_keyword_map.insert("bit");
+	colname_keyword_map.insert("boolean");
+	colname_keyword_map.insert("char");
+	colname_keyword_map.insert("character");
+	colname_keyword_map.insert("coalesce");
+	colname_keyword_map.insert("columns");
+	colname_keyword_map.insert("dec");
+	colname_keyword_map.insert("decimal");
+	colname_keyword_map.insert("exists");
+	colname_keyword_map.insert("extract");
+	colname_keyword_map.insert("float");
+	colname_keyword_map.insert("generated");
+	colname_keyword_map.insert("grouping");
+	colname_keyword_map.insert("grouping_id");
+	colname_keyword_map.insert("inout");
+	colname_keyword_map.insert("int");
+	colname_keyword_map.insert("integer");
+	colname_keyword_map.insert("interval");
+	colname_keyword_map.insert("map");
+	colname_keyword_map.insert("national");
+	colname_keyword_map.insert("nchar");
+	colname_keyword_map.insert("none");
+	colname_keyword_map.insert("nullif");
+	colname_keyword_map.insert("numeric");
+	colname_keyword_map.insert("out");
+	colname_keyword_map.insert("overlay");
+	colname_keyword_map.insert("position");
+	colname_keyword_map.insert("precision");
+	colname_keyword_map.insert("real");
+	colname_keyword_map.insert("row");
+	colname_keyword_map.insert("setof");
+	colname_keyword_map.insert("smallint");
+	colname_keyword_map.insert("struct");
+	colname_keyword_map.insert("substring");
+	colname_keyword_map.insert("time");
+	colname_keyword_map.insert("timestamp");
+	colname_keyword_map.insert("treat");
+	colname_keyword_map.insert("trim");
+	colname_keyword_map.insert("try_cast");
+	colname_keyword_map.insert("values");
+	colname_keyword_map.insert("varchar");
+	colname_keyword_map.insert("xmlattributes");
+	colname_keyword_map.insert("xmlconcat");
+	colname_keyword_map.insert("xmlelement");
+	colname_keyword_map.insert("xmlexists");
+	colname_keyword_map.insert("xmlforest");
+	colname_keyword_map.insert("xmlnamespaces");
+	colname_keyword_map.insert("xmlparse");
+	colname_keyword_map.insert("xmlpi");
+	colname_keyword_map.insert("xmlroot");
+	colname_keyword_map.insert("xmlserialize");
+	colname_keyword_map.insert("xmltable");
+
+	reserved_keyword_map.insert("all");
+	reserved_keyword_map.insert("analyse");
+	reserved_keyword_map.insert("analyze");
+	reserved_keyword_map.insert("and");
+	reserved_keyword_map.insert("any");
+	reserved_keyword_map.insert("array");
+	reserved_keyword_map.insert("as");
+	reserved_keyword_map.insert("asc");
+	reserved_keyword_map.insert("asymmetric");
+	reserved_keyword_map.insert("both");
+	reserved_keyword_map.insert("case");
+	reserved_keyword_map.insert("cast");
+	reserved_keyword_map.insert("check");
+	reserved_keyword_map.insert("collate");
+	reserved_keyword_map.insert("column");
+	reserved_keyword_map.insert("constraint");
+	reserved_keyword_map.insert("create");
+	reserved_keyword_map.insert("default");
+	reserved_keyword_map.insert("deferrable");
+	reserved_keyword_map.insert("desc");
+	reserved_keyword_map.insert("describe");
+	reserved_keyword_map.insert("distinct");
+	reserved_keyword_map.insert("do");
+	reserved_keyword_map.insert("else");
+	reserved_keyword_map.insert("end");
+	reserved_keyword_map.insert("except");
+	reserved_keyword_map.insert("false");
+	reserved_keyword_map.insert("fetch");
+	reserved_keyword_map.insert("for");
+	reserved_keyword_map.insert("foreign");
+	reserved_keyword_map.insert("from");
+	reserved_keyword_map.insert("group");
+	reserved_keyword_map.insert("having");
+	reserved_keyword_map.insert("in");
+	reserved_keyword_map.insert("initially");
+	reserved_keyword_map.insert("intersect");
+	reserved_keyword_map.insert("into");
+	reserved_keyword_map.insert("lambda");
+	reserved_keyword_map.insert("lateral");
+	reserved_keyword_map.insert("leading");
+	reserved_keyword_map.insert("limit");
+	reserved_keyword_map.insert("not");
+	reserved_keyword_map.insert("null");
+	reserved_keyword_map.insert("offset");
+	reserved_keyword_map.insert("on");
+	reserved_keyword_map.insert("only");
+	reserved_keyword_map.insert("or");
+	reserved_keyword_map.insert("order");
+	reserved_keyword_map.insert("pivot");
+	reserved_keyword_map.insert("pivot_longer");
+	reserved_keyword_map.insert("pivot_wider");
+	reserved_keyword_map.insert("placing");
+	reserved_keyword_map.insert("primary");
+	reserved_keyword_map.insert("qualify");
+	reserved_keyword_map.insert("references");
+	reserved_keyword_map.insert("returning");
+	reserved_keyword_map.insert("select");
+	reserved_keyword_map.insert("show");
+	reserved_keyword_map.insert("some");
+	reserved_keyword_map.insert("summarize");
+	reserved_keyword_map.insert("symmetric");
+	reserved_keyword_map.insert("table");
+	reserved_keyword_map.insert("then");
+	reserved_keyword_map.insert("to");
+	reserved_keyword_map.insert("trailing");
+	reserved_keyword_map.insert("true");
+	reserved_keyword_map.insert("union");
+	reserved_keyword_map.insert("unique");
+	reserved_keyword_map.insert("unpivot");
+	reserved_keyword_map.insert("using");
+	reserved_keyword_map.insert("variadic");
+	reserved_keyword_map.insert("when");
+	reserved_keyword_map.insert("where");
+	reserved_keyword_map.insert("window");
+	reserved_keyword_map.insert("with");
+"""
 
 """ normalize_function from duckdb
 static string NormalizeColumnName(const string &col_name) {

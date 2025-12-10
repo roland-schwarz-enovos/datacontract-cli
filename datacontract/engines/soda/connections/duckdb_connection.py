@@ -88,7 +88,7 @@ def get_duckdb_connection(
                         f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_csv('{model_path}', normalize_names = {normalize_names}, hive_partitioning=1, columns={columns});"""
                     )
                 except InvalidInputException as inex:
-                    run.log_info(f"duckdb_connection.py:68 - open file failed with: {str(inex)}")
+                    run.log_info(f"duckdb_connection.py:88 - open file failed with: {str(inex)}")
                     run.log_info( "Trying without column definition.")
                     columns = None
                     con.sql(
