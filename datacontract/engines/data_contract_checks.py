@@ -870,6 +870,32 @@ def check_quality_list(
                     implementation=yaml.dump(sodacl_check_dict),
                 )
             )
+        # Take care of "custom python engine"
+        elif quality.type == "custom" and quality.engine == 'custom_python_engine':     ## ENGINE_KEYWORD: Final[str] = "custom_python_engine"
+            # take care of custom_python_engine and then anything else.
+            engine                  = quality.engine
+            implementationdetails   = quality.implementation
+            if field_name is None:
+                check_key = f"{model_name}__{engine}_{count}"
+                check_type = "field_quality_custom_python_engine"
+            else:
+                check_key = f"{model_name}__{field_name}__{engine}_{count}"
+                check_type = "model_quality_custom_python_engine"
+            checks.append(
+                Check(
+                    id=str(uuid.uuid4()),
+                    key=check_key,
+                    category="quality",
+                    type=check_type,
+                    name=quality.description if quality.description is not None else "Quality Check",
+                    model=model_name,
+                    field=field_name,
+                    engine=engine,
+                    language="python",
+                    implementation=f"{implementationdetails}",
+                )
+            )
+        ## code moved to bottom of file
         elif quality.metric is not None:
             threshold = to_sodacl_threshold(quality)
 
@@ -1225,8 +1251,8 @@ def NormalizeColumnName( col_name : str) -> str:
     ##    (col_name_cleaned[0] >= '0' && col_name_cleaned[0] <= '9'))
 
     if col_name_cleaned[0] >=  '0' and col_name_cleaned[0] <= '9':
-        ## nah....
-        col_name_cleaned[0] = '_'
+        ## fixme : tests ...
+        col_name_cleaned = f"_{col_name[1:]}"
 
     return col_name_cleaned
 
@@ -1416,4 +1442,89 @@ static string NormalizeColumnName(const string &col_name) {
 	}
 	return col_name_cleaned;
 }
+"""
+
+
+"""
+elif quality.type == "custom" and quality.engine != 'custom_python_engine':
+    # translate custom soda code to sodaCL
+    # - type: custom
+    #    description: This column should have values above numeric zero
+    #    dimension: conformity
+    #    severity: error
+    #    businessImpact: operational
+    #    engine: soda
+    #    implementation: |
+    #        checks for installed_capacity_pos:
+    #          - invalid_count(installed_capacity_pos) = 0:
+    #            invalid values: [ 0.0 ]
+
+    engine              = quality.engine
+    sodacl              = quality.implementation
+    if field_name is None:
+        check_key = f"{model_name}__quality_custom_{engine}_{count}"
+        check_type = "field_quality_custom"
+    else:
+        check_key = f"{model_name}__{field_name}__quality_custom_{engine}_{count}"
+        check_type = "model_quality_custom"
+    checks.append(
+        Check(
+            id=str(uuid.uuid4()),
+            key=check_key,
+            category="quality",
+            type=check_type,
+            name=quality.description if quality.description is not None else "Quality Check",
+            model=model_name,
+            field=field_name,
+            engine=engine,
+            language="sodacl",
+            implementation=sodacl,
+        )
+    )
+# leaving this commented out until checked if this has been handled at another place during development on side of datacontract-cli
+elif quality.type == "library":
+    if field_name is None:
+        check_key = f"{model_name}__quality_{quality.type}_{count}"
+        check_type = f"field_quality_{quality.type}"
+    else:
+        check_key = f"{model_name}__{field_name}__{quality.type}_{count}"
+        check_type = f"model_quality_{quality.type}"
+    # switch between possible check types, translate type to sodaCL
+    library_rule_name = quality.model_extra['rule'] if 'rule' in quality.model_extra else ''
+
+    if ( library_rule_name == 'uniqueCheck' ):
+        checks.append(
+            check_field_unique(model_name, field_name, True)
+        )
+    if ( library_rule_name == 'nullCheck' ):
+        checks.append(
+            check_field_required(model_name, field_name, True)
+        )
+    if ( library_rule_name == 'valueCheck'):
+        translate_type_custom()
+
+    #if ( library_rule_name == 'jsonStructure' ):
+        ## fixme: implement or ignore ?
+    #    raise NotImplementedError("fixme: still to implement this one ")
+    #if ( library_rule_name == 'validValues' ):
+        ## Note: is specified in odcs 3.0.2 - not yet present in version 3.0.1
+    #    valuesProvidedTmp = quality.model_extra['validValues'] if 'validValues' in quality.model_extra else None
+        ## Convert to list, if some obscure value is provided.
+    #    valuesProvided    = []
+    #    raise NotImplementedError("fixme: parameter not yet parsed in contract yaml.")
+    #    checks.append(
+    #        check_field_enum(model_name, field_name, valuesProvided, True)
+    #    )
+    ## wroong place, needs to be placed somewhere where row properties are evaluated
+    if ( library_rule_name == 'rowCount' ):
+        # rule: rowCount
+        # mustBeBetween: [100, 120]
+        # name: Verify row count range
+        translate_type_custom()
+    ## note: if the pattern above repeates -> create a translate function
+    if ( library_rule_name == 'numericRange' ):
+        # rule: rowCount
+        # mustBeBetween: [100, 120]
+        # name: Verify row count range
+        translate_type_custom()
 """
