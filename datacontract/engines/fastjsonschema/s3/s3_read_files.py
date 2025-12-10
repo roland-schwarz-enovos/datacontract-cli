@@ -15,7 +15,7 @@ def yield_s3_files(s3_endpoint_url, s3_location):
 
 # Copy of original yield_s3_files with simple addon to get the object source name, aka "file name"
 # Fixme: Test.
-def yield_s3_files_with_file_object(s3_endpoint_url, s3_location) -> Generator[tuple[object,str|bytes]]:
+def yield_s3_files_with_file_object(s3_endpoint_url, s3_location): ## -> Generator[tuple[object,str|bytes]]:    ## Note: RT-Compiler did not like this.
     fs = s3_fs(s3_endpoint_url)
     files = fs.glob(s3_location)
     for file in files:
