@@ -3,13 +3,20 @@
 Struct: Note: Test what happens with test that have a custom engine defined.
 run.checks gets filtered for one type of engine.
 
-check.implementation
+
+    # pattern of the definition
+    - type: custom
+       description: Test that the difference between columnA(row=1) and columnB(row=1) is in a specific time range.
+     (..)
+        engine: custom_python_engine
+        implementation: |
+          column: values
+          plugin: OnJsonTestTimeDelta
 
 """
 
 import os
 import typing
-
 import yaml
 
 if typing.TYPE_CHECKING:
@@ -17,13 +24,13 @@ if typing.TYPE_CHECKING:
 
 from typing import Final
 
-from duckdb.duckdb import DuckDBPyConnection
+from duckdb import DuckDBPyConnection
 
 from datacontract.engines.custom_python_engine.PluginEngine import (
     DataQualityAbstractBasePlugin,
     DataQualityPluginRegistry,
 )
-from datacontract.engines.soda.connections.duckdb_connection import get_duckdb_connection
+
 from datacontract.model.data_contract_specification import DataContractSpecification, Server
 from datacontract.model.run import Check, ResultEnum, Run
 
@@ -100,12 +107,14 @@ def check_custom_python_engine_execute(
         ## nothing to test, bye.
         run.log_info(f"No custom tests for {ENGINE_KEYWORD} defined, leaving.")
         return
-    soda_configuration = {}
-    ## setup duckdb, basically a copy, paste and remove elements I have not figured out yet. Taken from the original soda-engine-file.
+
+    # setup duckdb. Parts of the code are basically "copy, paste and remove elements" from another section (the original soda-engine-file)
+    # where I have not figured out yet what is needed.
     NewDuckdbConnection = None
     if server.type in ["s3", "gcs", "azure", "local"]:
         if server.format in ["json", "parquet", "csv", "delta"]:
             run.log_info(f"Configuring engine custom-python to connect to {server.type} {server.format} with duckdb")
+            from datacontract.engines.soda.connections.duckdb_connection import get_duckdb_connection
             NewDuckdbConnection = get_duckdb_connection(data_contract, server, run, duckdb_connection)
         else:
             run.checks.append(
@@ -118,48 +127,11 @@ def check_custom_python_engine_execute(
                 )
             )
             run.log_warn(f"Format {server.format} not yet supported by datacontract CLI")
-            ## Bail out, no connection yet
+            ## Bail out, no connection.
             return
     elif server.type == "postgres":
-
-        from os import getenv
-        import duckdb
-
-        soda_configuration = {
-            f"data_source {server.type}": {
-                "type": "postgres",
-                "host": server.host,
-                "port": str(server.port),
-                "username": os.getenv("DATACONTRACT_POSTGRES_USERNAME"),
-                "password": os.getenv("DATACONTRACT_POSTGRES_PASSWORD"),
-                "database": server.database,
-                "schema": server.schema_,
-            }
-        }
-
-        con = duckdb.connect()
-        # Note to Devs: hostaddr requires somethingy like an IP, host can take a name.
-        # fixme: use a secret.
-        cs: str = f"""ATTACH 'dbname={server.database} host={server.host} port={str(server.port)} user={os.getenv("DATACONTRACT_POSTGRES_USERNAME")} password={os.getenv("DATACONTRACT_POSTGRES_PASSWORD")}' AS db (TYPE postgres, READ_ONLY );"""
-
-        con.sql(f"""
-            INSTALL postgres;
-            LOAD postgres;
-            ATTACH '
-                dbname={server.database}
-                host={server.host}
-                port={str(server.port)}
-                user={os.getenv("DATACONTRACT_POSTGRES_USERNAME")}
-                password={os.getenv("DATACONTRACT_POSTGRES_PASSWORD")}
-
-            ' AS db (TYPE postgres, READ_ONLY );
-            """)    ##
-        NewDuckdbConnection = con
-        #                 schema={server.schema_}
-        # con.sql("select * from example")
-        #soda_configuration_str = to_postgres_soda_configuration(server)
-        #scan.add_configuration_yaml_str(soda_configuration_str)
-        #scan.set_data_source_name(server.type)
+        from datacontract.engines.custom_python_engine.connections.postgres import connect_to_postgres_via_duckdb
+        NewDuckdbConnection = connect_to_postgres_via_duckdb(server)
     else:
         raise NotImplementedError(f"Connection to {server.type} has not yet been implemented.")
 
@@ -167,17 +139,10 @@ def check_custom_python_engine_execute(
         duckdb_connection = NewDuckdbConnection
 
     ## Fixme: dirt. Configure this through environment or some other way.
-    searchfolders: list[str] = [basefolderByMasterconfig]
-    knownDQPluginsList = discover_plugins(searchfolders)
+    searchfolders: list[str]    = [basefolderByMasterconfig]
+    knownDQPluginsList          = discover_plugins(searchfolders)
     run.log_info(f"::data_contract_custom_test.py::130 plugins discovered: {knownDQPluginsList}")
-    # pattern of the definition
-    # - type: custom
-    #    description: Test that the difference between columnA(row=1) and columnB(row=1) is in a specific time range.
-    # (..)
-    #    engine: custom_python_engine
-    #    implementation: |
-    #      column: values
-    #      plugin: OnJsonTestTimeDelta
+
     # FIXME: Change the column to a list datatype,
     ## pte -> plugins to execute
     pte: list = []
@@ -186,7 +151,6 @@ def check_custom_python_engine_execute(
     # FIXME: change this in a way, that I can ... remember to finish my sentences.
     plugins: list = [P(duckdb_connection, run, custom_python_tests, data_contract) for P in knownDQPluginsList]
     ## need to initialize the plugin with the corresponding values for the columns to be tested.
-
     for ch in custom_python_tests:
         impl_yaml = yaml.safe_load(ch.implementation)
         run.log_info(f"::data_contract_custom_test.py::150:: impl_yaml = {impl_yaml}")
@@ -201,7 +165,6 @@ def check_custom_python_engine_execute(
                 knp.dc_implementation   = ch.implementation
                 knp.yaml_implementation = impl_yaml
                 knp.check               = ch                    ## need to deliver the check itself for more details.
-                knp.sodaconfig          = soda_configuration
                 knp.server              = server                ## more and more dirt gets dumped into the plugin. FIXME: Add a cleanup routine.
                 pte.append(knp)
                 ## keep track of plugins that have been found.

@@ -13,7 +13,6 @@ if typing.TYPE_CHECKING:
 
 from datacontract.engines.csvschema import check_csvschema
 from datacontract.engines.custom_python_engine.data_contract_custom_test import check_custom_python_engine_execute
-
 from datacontract.engines.datacontract.check_that_datacontract_contains_valid_servers_configuration import (
     check_that_datacontract_contains_valid_server_configuration,
 )

@@ -17,15 +17,20 @@ Yields:
 import io
 import logging
 import os
-from typing import List, Optional, Dict
+from typing import Dict, List
+
 import duckdb
+
+from datacontract.engines.csvschema.csvExceptions import (
+    CSVSchemaValueException,  ##, CSVSchemaInputFileException, CSVSchemaValidationException
+)
 
 ## Re-use this to read from S3, should work also with csv.
 from datacontract.engines.fastjsonschema.s3.s3_read_files import yield_s3_files_with_file_object
-from datacontract.model.data_contract_specification import DataContractSpecification, Server, Field, Model
+from datacontract.model.data_contract_specification import DataContractSpecification, Field, Model, Server
 from datacontract.model.exceptions import DataContractException
-from datacontract.model.run import Check, ResultEnum, Run                           ## not yet referenced
-from datacontract.engines.csvschema.csvExceptions import CSVSchemaValueException    ##, CSVSchemaInputFileException, CSVSchemaValidationException
+from datacontract.model.run import Check, ResultEnum, Run  ## not yet referenced
+
 
 def process_exceptions(run, exceptions: List[DataContractException], _file_locator = None):
     if not exceptions:
@@ -128,7 +133,7 @@ def run_datatest_for_schema_validation( datafile_in, column_index_to_test: int, 
         ## try parse.
         ## date.
         if required_data_type == "date":
-            from dateutil.parser import parse, ParserError
+            from dateutil.parser import ParserError, parse
             try:
                 testvalue: str = ''
                 if isinstance(se, tuple):
@@ -358,7 +363,7 @@ def validate_csv(
                         type="schema",
                         name="Check that CSV has valid schema",
                         result=ResultEnum.failed,
-                        reason=f"Precheck of the CSV failed - File empty ?",
+                        reason="Precheck of the CSV failed - File empty ?",
                         model=model_name,
                         engine="csvschema",
                         message='Is the File empty ?',

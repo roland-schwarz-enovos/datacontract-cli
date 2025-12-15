@@ -14,8 +14,9 @@
             plugin: OnJsonTestTimeDelta
 """
 
-from datacontract.model.data_contract_specification import DataContractSpecification, Server
+from datacontract.model.data_contract_specification import Server
 from datacontract.model.run import Check
+
 
 class DataQualityPluginRegistry(type):
     plugins:list    = []
@@ -31,7 +32,6 @@ class DataQualityAbstractBasePlugin(object, metaclass=DataQualityPluginRegistry)
     dc_implementation:      str         = ''
     yaml_implementation:    object|None = None
     check:                  Check|None  = None                     ## need to deliver the check itself for more details.
-    sodaconfig:             object|None = None
     server:                 Server|None = None
 
     def __init__(self, _duckdbconnection=None, _run=None, _ctl:list|None=None, _datacontract=None):
@@ -42,7 +42,3 @@ class DataQualityAbstractBasePlugin(object, metaclass=DataQualityPluginRegistry)
         self.run                = _run
         self.customtestlist     = _ctl
         self.datacontract       = _datacontract
-        #self.modelname = ""
-        ## fixme: this is a POC-dirt galore.
-        #for model_name, model in self.datacontract.models.items():
-        #    self.modelname = model_name
