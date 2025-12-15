@@ -17,6 +17,7 @@ run.checks gets filtered for one type of engine.
 
 import os
 import typing
+
 import yaml
 
 if typing.TYPE_CHECKING:
@@ -30,7 +31,6 @@ from datacontract.engines.custom_python_engine.PluginEngine import (
     DataQualityAbstractBasePlugin,
     DataQualityPluginRegistry,
 )
-
 from datacontract.model.data_contract_specification import DataContractSpecification, Server
 from datacontract.model.run import Check, ResultEnum, Run
 

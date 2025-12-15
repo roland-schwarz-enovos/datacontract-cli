@@ -62,11 +62,11 @@ def get_duckdb_connection(
             columns = to_json_types(model)
             if columns is None:
                 con.sql(f"""
-                        CREATE VIEW "{model_name}" AS SELECT * FROM read_json_auto('{model_path}', format='{json_format}', hive_partitioning=1);
+                        CREATE VIEW "{model_name}" AS SELECT * FROM read_json_auto('{model_path}', format='{json_format}', hive_partitioning=1, filename=true);
                         """)
             else:
                 con.sql(
-                    f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_json_auto('{model_path}', format='{json_format}', columns={columns}, hive_partitioning=1);"""
+                    f"""CREATE VIEW "{model_name}" AS SELECT * FROM read_json_auto('{model_path}', format='{json_format}', columns={columns}, hive_partitioning=1. filename=true);"""
                 )
                 add_nested_views(con, model_name, model.fields)
         elif server.format == "parquet":

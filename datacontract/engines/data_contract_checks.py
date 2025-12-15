@@ -159,7 +159,7 @@ def to_model_name(model_key, model_value, server_type):
 
 def check_field_is_present(model_name, field_name, quoting_config: QuotingConfig = QuotingConfig()) -> Check:
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
     check_type = "field_is_present"
@@ -195,7 +195,7 @@ def check_field_type(
     model_name: str, field_name: str, expected_type: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
     check_type = "field_type"
@@ -231,7 +231,7 @@ def check_field_type(
 
 def check_field_required(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -268,7 +268,7 @@ def check_field_required(model_name: str, field_name: str, quoting_config: Quoti
 
 def check_field_unique(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -307,7 +307,7 @@ def check_field_min_length(
     model_name: str, field_name: str, min_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -347,7 +347,7 @@ def check_field_max_length(
     model_name: str, field_name: str, max_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -387,7 +387,7 @@ def check_field_minimum(
     model_name: str, field_name: str, minimum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -428,7 +428,7 @@ def check_field_maximum(
     model_name: str, field_name: str, maximum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -468,7 +468,7 @@ def check_field_not_equal(
     model_name: str, field_name: str, value: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -506,7 +506,7 @@ def check_field_not_equal(
 
 def check_field_enum(model_name: str, field_name: str, enum: list, quoting_config: QuotingConfig = QuotingConfig()):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -544,7 +544,7 @@ def check_field_enum(model_name: str, field_name: str, enum: list, quoting_confi
 
 def check_field_regex(model_name: str, field_name: str, pattern: str, quoting_config: QuotingConfig = QuotingConfig()):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -635,7 +635,7 @@ def check_field_duplicate_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -674,7 +674,7 @@ def check_field_null_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -717,7 +717,7 @@ def check_field_invalid_values(
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -766,7 +766,7 @@ def check_field_missing_values(
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 
@@ -818,7 +818,7 @@ def check_quality_list(
     server: Server = None,
 ) -> List[Check]:
     field_name_orig: str = field_name
-    if quoting_config.rewrite_csv_columnnames == True:
+    if quoting_config.rewrite_csv_columnnames:
         ## rewrite with function 'borrowed' from duckdb cpp code
         field_name = NormalizeColumnName( field_name )
 

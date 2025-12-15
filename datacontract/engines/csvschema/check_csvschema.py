@@ -44,7 +44,7 @@ def process_exceptions(run, exceptions: List[DataContractException], _file_locat
         error_limit = 500
 
     # Calculate the effective limit to avoid index out of range
-    limit = min(len(exceptions), error_limit)
+    min(len(exceptions), error_limit)
     # Add all exceptions up to the limit - 1 to `run.checks`.
     DEFAULT_ERROR_MESSAGE = "An error occurred during validation phase. See the logs for more details."
     for exception in exceptions:
@@ -123,11 +123,11 @@ def run_datatest_for_schema_validation( datafile_in, column_index_to_test: int, 
                 # check if none. if one item is none, dump it.
                 ## third iteration of nothingness. Tuple of Strings with spaces.
                 preprocessedInput: str = str(si).strip()
-                if si == None or (preprocessedInput == '' or preprocessedInput is None):
+                if si is None or (preprocessedInput == '' or preprocessedInput is None):
                     cantDetermine.append(lc1)
                     forLoopShiftedContinue = True
 
-        if True == forLoopShiftedContinue:
+        if forLoopShiftedContinue:
             continue
 
         ## try parse.
@@ -193,7 +193,7 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
     import duckdb
     ## key = column name, values -> dictionary of props ( type: number etc.. )
     fields_from_model: dict             = schema['properties']
-    required_fields_from_model: dict    = schema['required']
+    schema['required']
     csvSchema_test_results: dict        = dict()
     ##
     csvddb = None
@@ -211,7 +211,6 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
     key_column_name: str        = 'column_name'
     key_column_type: str        = 'column_datatype_from_duckdb'
     key_column_type_remap: str  = 'column_datatype_remapped_to_dccli'
-    key_column_required: str    = 'column_datatype_required'
 
     datafields: dict    = dict()
     counter: int        = 0
@@ -253,7 +252,7 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
         ## note: need to possibly remap data types for dc-cli & duckdb interaction.
         currentFieldType:str        = currentFieldSchema[key_column_type_remap]
         currentFieldName:str        = currentFieldSchema[key_column_name]
-        currentFieldTypeDuckDB: str = currentFieldSchema[key_column_type]
+        currentFieldSchema[key_column_type]
         columnNameMismatch: bool    = False
         if schemaColumnName != currentFieldName:
             localmessage = f"{errorMessage}\n Column name mismatch at {columnindex}, name: {schemaColumnName} does not match {currentFieldName}"
@@ -273,14 +272,14 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
 
             if not columnNameMismatch:
                 datatestresult = run_datatest_for_schema_validation( csv_obj, columnindex, schemaColumnName, schemalogicalType)
-                if False == datatestresult['result'] and False == datatestresult['NoDataInColumn']:
+                if not datatestresult['result'] and not datatestresult['NoDataInColumn']:
                     ## schema mismatch and data mismatch, leavo with Exceptio
                     localmessage = f"Column type mismatch at {columnindex} with name: {schemaColumnName}, type: {schemalogicalType} does not match expected {currentFieldType}"
                     errorMessage = f"{errorMessage}\n {localmessage}"
                     typeErrorsCounter+=1
                     mx = fieldresult_pattern_a(columnindex, 'isTypeMismatch', True, localmessage, schemaColumnName, currentFieldName )
                     listOfFieldResults.append( mx )
-                elif False == datatestresult['result'] and True == datatestresult['NoDataInColumn']:
+                elif not datatestresult['result'] and datatestresult['NoDataInColumn']:
                     ## For the moment: I have no data in the column to test, so the expected data type can't be validated.
                     ## duckdb is assuming a varchar/string as default in this case, so we will assume, that the data type matches and don't throw this as error.
                     ## Fixme: How to treat this. log and warn ?
@@ -290,7 +289,7 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
                     ## Collect columns with type errors
                     mx = fieldresult_pattern_a(columnindex, 'isInconclusive', True, localmessage, schemaColumnName, currentFieldName )
                     listOfFieldResults.append( mx )
-                elif True == datatestresult['result']:
+                elif datatestresult['result']:
                     ## ran through the values, this column is valid with the data types from the contract.
                     fieldsClear.append(columnindex)
                     errorMessage = f"{errorMessage}\ntype mismatch by autodetection, cleared up with testing the values at {columnindex}, type from schema: {schemalogicalType} mismatched with autodetect: {currentFieldType}, mismatch ignored."
@@ -340,7 +339,7 @@ def validate_csv(
         validationresults: dict = dict()
         ## fixme: execute some prechecks. is the file empty.
         pretest = precheck_file(csv_filename)
-        if ( pretest['precheck_passed'] == True):
+        if ( pretest['precheck_passed']):
             try:
                 ## this one calls the new CSV validator
                 validationresults = validate(csv_filename, schema, model_name, delimiter)
@@ -372,15 +371,14 @@ def validate_csv(
         ## evaluate the results in dictionary validationresults
         if len(validationresults) > 0 and 'field_results' in validationresults:
             for single_field in validationresults['field_results']:
-                errortype: str = ''
-                if 'isNameMismatch' in single_field and single_field['isNameMismatch'] == True:
-                    errortype = 'Column names don\'t match'
-                elif 'isTypeMismatch' in single_field and single_field['isTypeMismatch'] == True:
-                    errortype = 'Column types don\'t match'
-                elif 'isInconclusive' in single_field and single_field['isInconclusive'] == True:
-                    errortype = 'Column data types between Contract and field are inconcolusive.'
+                if 'isNameMismatch' in single_field and single_field['isNameMismatch']:
+                    pass
+                elif 'isTypeMismatch' in single_field and single_field['isTypeMismatch']:
+                    pass
+                elif 'isInconclusive' in single_field and single_field['isInconclusive']:
+                    pass
                 else:
-                    errortype = 'None yet'
+                    pass
                 column_name_failed: str = f"local datasource: {single_field['columnNameDatasource']}, contract: {single_field['columnNameContract']}"
                 ##fixme: result: if only inconclusive -> make it a warning.
                 dcx = DataContractException(
