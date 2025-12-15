@@ -7,6 +7,7 @@ from datacontract.export.duckdb_type_converter import convert_to_duckdb_csv_type
 from datacontract.model.data_contract_specification import DataContractSpecification, Field, Model, Server
 from datacontract.model.run import Run
 
+
 ## This one looks into the model, if input is csv, to determine if there are field names in the file that contain spaces or any other shenanigans
 ## and then applies the field_normalization while reading the source.
 def determine_if_normalize_is_needed(
