@@ -1,0 +1,1 @@
+# Left empty for the moment, as a complete copy&paste from soda.connections.duckdb ... makes no real sense.

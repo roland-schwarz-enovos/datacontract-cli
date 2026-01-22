@@ -67,7 +67,7 @@ def execute_data_contract_test(
     check_soda_execute(run, data_contract, server, spark, duckdb_connection)
 
     ## Custom engine for additional checks. History: There was a need to run customized checks on more complex json data.
-    ##check_custom_python_engine_execute(run, data_contract, server, spark, duckdb_connection)
+    check_custom_python_engine_execute(run, data_contract, server, spark, duckdb_connection)
 
 
 def get_server(data_contract: OpenDataContractStandard, server_name: str = None) -> Server | None:
