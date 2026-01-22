@@ -9,28 +9,6 @@ from datacontract.export.duckdb_type_converter import convert_to_duckdb_csv_type
 from datacontract.export.sql_type_converter import convert_to_duckdb
 from datacontract.model.run import Run
 
-from datacontract.engines.csvschema.schematools import NormalizeColumnName
-
-## This one looks into the model, if input is csv, to determine if there are field names in the file that contain spaces or any other shenanigans
-## and then applies the field_normalization while reading the source.
-def determine_if_normalize_is_needed(
-    data_contract: OpenDataContractStandard,
-    ) -> bool:
-        ##for schema_obj in data_contract.schema_:
-        print (f"duckdbconnection::19:: datacontract = {data_contract}")
-        for mi in data_contract.schema_:
-            print (f"duckdbconnection::21:: mi = {mi}")
-            if isinstance(mi, SchemaObject):
-                print(f"24:: fi = {mi}")
-                for sfi in mi.properties:
-                    print(f"26: value of = {sfi} ...")
-                    ## now test for thingies to normalize.
-                    if not str(sfi.name).isalnum():
-                        print(f"{sfi} is not pure alphanum, clensing comitted...")
-                        return True
-            else:
-                print(f"32:: fi is not a schemaObject {mi}")
-        return False
 
 def get_duckdb_connection(
     data_contract: OpenDataContractStandard,
@@ -83,9 +61,7 @@ def get_duckdb_connection(
             elif server.format == "parquet":
                 create_view_with_schema_union(con, schema_obj, model_path, "read_parquet", to_parquet_types)
             elif server.format == "csv":
-                normres:bool    = determine_if_normalize_is_needed(data_contract)
-                create_view_with_schema_union(con, schema_obj, model_path, "read_csv", to_csv_types, normres)
-                #create_view_with_schema_union(con, schema_obj, model_path, "read_csv", to_csv_types)
+                create_view_with_schema_union(con, schema_obj, model_path, "read_csv", to_csv_types)
             elif server.format == "delta":
                 con.sql("update extensions;")  # Make sure we have the latest delta extension
                 con.sql(f"""CREATE VIEW "{model_name}" AS SELECT * FROM delta_scan('{model_path}');""")
@@ -95,50 +71,32 @@ def get_duckdb_connection(
     return con
 
 
-def create_view_with_schema_union(con, schema_obj: SchemaObject, model_path: str, read_function: str, type_converter, normalize_names: bool = False):
+def create_view_with_schema_union(con, schema_obj: SchemaObject, model_path: str, read_function: str, type_converter):
     """Create a view by unioning empty schema table with data files using union_by_name"""
     converted_types = type_converter(schema_obj)
     model_name = schema_obj.name
-    normalize_names_str = "{}".format(normalize_names)
     if converted_types:
         # Create empty table with contract schema
-        ## if normalizeColumnNames: normalize them here so that this tupid changed loading mechanism can apply the needed changes so that all columns will be there.
-        if normalize_names == True:
-            columns_def = [f'"{NormalizeColumnName(col_name)}" {col_type}' for col_name, col_type in converted_types.items()]
-        else:
-            columns_def = [f'"{col_name}" {col_type}' for col_name, col_type in converted_types.items()]
+        columns_def = [f'"{col_name}" {col_type}' for col_name, col_type in converted_types.items()]
         create_empty_table = f"""CREATE TABLE "{model_name}" ({', '.join(columns_def)});"""
         con.sql(create_empty_table)
 
-        ##rsc: debug
-        '''
-        strx:str = f"""SELECT column_name
-            FROM (DESCRIBE SELECT * FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1, normalize_names = {normalize_names_str}))
-            INTERSECT SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = '{model_name}'"""
-        ##rsc: debug
-        print (f"duckdb_connection::114:: strx has value:\n{strx}")
-        '''
         # Read columns existing in both current data contract and data
         intersecting_columns = con.sql(f"""SELECT column_name
-            FROM (DESCRIBE SELECT * FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1, normalize_names = {normalize_names_str}))
+            FROM (DESCRIBE SELECT * FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1))
             INTERSECT SELECT column_name
             FROM information_schema.columns
             WHERE table_name = '{model_name}'""").fetchall()
         selected_columns = ', '.join([column[0] for column in intersecting_columns])
 
-        ##rsc: debug
-        print ( f"123:: intersecting_columns = {intersecting_columns}")
-        print ( f"123:: selected_columns = {selected_columns}")
         # Insert data into table by name, but only columns existing in contract and data
         insert_data_sql = f"""INSERT INTO {model_name} BY NAME
-            (SELECT {selected_columns} FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1, normalize_names = {normalize_names_str}));"""
+            (SELECT {selected_columns} FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1));"""
         con.sql(insert_data_sql)
     else:
         # Fallback
         con.sql(
-            f"""CREATE VIEW "{model_name}" AS SELECT * FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1, normalize_names = {normalize_names_str});"""
+            f"""CREATE VIEW "{model_name}" AS SELECT * FROM {read_function}('{model_path}', union_by_name=true, hive_partitioning=1);"""
         )
 
 def to_csv_types(schema_obj: SchemaObject) -> dict[Any, str | None] | None:
