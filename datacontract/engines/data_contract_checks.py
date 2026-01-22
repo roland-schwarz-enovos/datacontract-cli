@@ -13,6 +13,7 @@ from open_data_contract_standard.model import (
     Server,
 )
 
+from datacontract.engines.csvschema.schematools import NormalizeColumnName
 from datacontract.export.sql_type_converter import convert_to_sql_type
 from datacontract.model.run import Check
 
@@ -22,6 +23,7 @@ class QuotingConfig:
     quote_field_name: bool = False
     quote_model_name: bool = False
     quote_model_name_with_backticks: bool = False
+    rewrite_csv_columnnames: bool = False
 
 
 def _get_logical_type_option(prop: SchemaProperty, key: str):
@@ -64,25 +66,51 @@ def create_checks(data_contract: OpenDataContractStandard, server: Server) -> Li
 
 def to_schema_checks(schema_object: SchemaObject, server: Server) -> List[Check]:
     checks: List[Check] = []
-    server_type = server.type if server and server.type else None
-    schema_name = to_schema_name(schema_object, server_type)
-    properties = schema_object.properties or []
+    server_type  = server.type if server and server.type else None
+    schema_name  = to_schema_name(schema_object, server_type)
+    properties   = schema_object.properties or []
+    server_format = server.format if server.format is not None else ""
+    check_types  = is_check_types(server)
 
-    check_types = is_check_types(server)
-
-    type1 = server.type if server and server.type else None
+    type1  = server.type if server and server.type else None
     config = QuotingConfig(
         quote_field_name=type1 in ["postgres", "sqlserver"],
         quote_model_name=type1 in ["postgres", "sqlserver"],
         quote_model_name_with_backticks=type1 == "bigquery",
+        rewrite_csv_columnnames=False,
     )
     quoting_config = config
 
-    for prop in properties:
-        property_name = prop.name
-        logical_type = prop.logicalType
+    checks = to_schema_checks_rc(0, '', properties, server, quoting_config, schema_name, server_format, server_type, check_types)
 
-        checks.append(check_property_is_present(schema_name, property_name, quoting_config))
+    if schema_object.quality is not None and len(schema_object.quality) > 0:
+        quality_list = check_quality_list(schema_name, None, schema_object.quality, quoting_config, server)
+        if (quality_list is not None) and len(quality_list) > 0:
+            checks.extend(quality_list)
+
+    return checks
+
+def to_schema_checks_rc(level: int, super_property_name: str, properties: List[SchemaProperty], server: Server, quoting_config: QuotingConfig, schema_name: str, server_format: str, server_type: str|None, check_types ) -> List[Check]:
+
+    level = level + 1
+    checks: List[Check] = []
+    for prop in properties:
+        _property_name: str = str(prop.name)
+        property_name: str  = _property_name
+        if server_format == "json":
+            if (level - 1) >= 1:  # If we are on the initial object level, don't apply any changes.
+                property_name = f"{super_property_name}.{_property_name}"
+
+
+        if server_format == "csv" and (not property_name.isalnum()):
+            quoting_config.rewrite_csv_columnnames    = True
+
+        logical_type = prop.logicalType
+        # FIXME: Fix the logic to avoid this empty if expression
+        if server_format == "json" and ((level - 1) >= 1):
+            None  ## "nop()"
+        else:
+            checks.append(check_property_is_present(schema_name, property_name, quoting_config))
         if check_types and logical_type is not None:
             sql_type: str = convert_to_sql_type(prop, server_type)
             checks.append(check_property_type(schema_name, property_name, sql_type, quoting_config))
@@ -130,10 +158,10 @@ def to_schema_checks(schema_object: SchemaObject, server: Server) -> List[Check]
             if (quality_list is not None) and len(quality_list) > 0:
                 checks.extend(quality_list)
 
-    if schema_object.quality is not None and len(schema_object.quality) > 0:
-        quality_list = check_quality_list(schema_name, None, schema_object.quality, quoting_config, server)
-        if (quality_list is not None) and len(quality_list) > 0:
-            checks.extend(quality_list)
+        if prop.properties is not None and len(prop.properties) > 0:
+            ## rc_call
+            im_list = to_schema_checks_rc(level, property_name, prop.properties, server, quoting_config, schema_name, server_format, server_type, check_types)
+            checks.extend(im_list)
 
     return checks
 
@@ -167,6 +195,11 @@ def to_schema_name(schema_object: SchemaObject, server_type: str) -> str:
 
 
 def check_property_is_present(model_name, field_name, quoting_config: QuotingConfig = QuotingConfig()) -> Check:
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     check_type = "field_is_present"
     check_key = f"{model_name}__{field_name}__{check_type}"
     sodacl_check_dict = {
@@ -189,6 +222,7 @@ def check_property_is_present(model_name, field_name, quoting_config: QuotingCon
         name=f"Check that field '{field_name}' is present",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -198,6 +232,11 @@ def check_property_is_present(model_name, field_name, quoting_config: QuotingCon
 def check_property_type(
     model_name: str, field_name: str, expected_type: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     check_type = "field_type"
     check_key = f"{model_name}__{field_name}__{check_type}"
     sodacl_check_dict = {
@@ -222,6 +261,7 @@ def check_property_type(
         name=f"Check that field {field_name} has type {expected_type}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -229,6 +269,10 @@ def check_property_type(
 
 
 def check_property_required(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -253,6 +297,7 @@ def check_property_required(model_name: str, field_name: str, quoting_config: Qu
         name=f"Check that field {field_name} has no missing values",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -260,6 +305,11 @@ def check_property_required(model_name: str, field_name: str, quoting_config: Qu
 
 
 def check_property_unique(model_name: str, field_name: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -284,6 +334,7 @@ def check_property_unique(model_name: str, field_name: str, quoting_config: Quot
         name=f"Check that unique field {field_name} has no duplicate values",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -293,6 +344,11 @@ def check_property_unique(model_name: str, field_name: str, quoting_config: Quot
 def check_property_min_length(
     model_name: str, field_name: str, min_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -318,6 +374,7 @@ def check_property_min_length(
         name=f"Check that field {field_name} has a min length of {min_length}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -327,6 +384,10 @@ def check_property_min_length(
 def check_property_max_length(
     model_name: str, field_name: str, max_length: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -352,6 +413,7 @@ def check_property_max_length(
         name=f"Check that field {field_name} has a max length of {max_length}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -361,6 +423,10 @@ def check_property_max_length(
 def check_property_minimum(
     model_name: str, field_name: str, minimum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -386,6 +452,7 @@ def check_property_minimum(
         name=f"Check that field {field_name} has a minimum of {minimum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -395,6 +462,11 @@ def check_property_minimum(
 def check_property_maximum(
     model_name: str, field_name: str, maximum: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -420,6 +492,7 @@ def check_property_maximum(
         name=f"Check that field {field_name} has a maximum of {maximum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -429,6 +502,11 @@ def check_property_maximum(
 def check_property_not_equal(
     model_name: str, field_name: str, value: int, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -454,6 +532,7 @@ def check_property_not_equal(
         name=f"Check that field {field_name} is not equal to {value}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -461,6 +540,11 @@ def check_property_not_equal(
 
 
 def check_property_enum(model_name: str, field_name: str, enum: list, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -486,6 +570,7 @@ def check_property_enum(model_name: str, field_name: str, enum: list, quoting_co
         name=f"Check that field {field_name} only contains enum values {enum}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -493,6 +578,10 @@ def check_property_enum(model_name: str, field_name: str, enum: list, quoting_co
 
 
 def check_property_regex(model_name: str, field_name: str, pattern: str, quoting_config: QuotingConfig = QuotingConfig()):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -518,6 +607,7 @@ def check_property_regex(model_name: str, field_name: str, pattern: str, quoting
         name=f"Check that field {field_name} matches regex pattern {pattern}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -551,9 +641,18 @@ def check_row_count(model_name: str, threshold: str, quoting_config: QuotingConf
 def check_model_duplicate_values(
     model_name: str, cols: list[str], threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    col_joined_original = ", ".join(cols)
+
     check_type = "model_duplicate_values"
     check_key = f"{model_name}__{check_type}"
-    col_joined = ", ".join(cols)
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        cols_normalized = []
+        for col in cols:
+            cols_normalized.append( NormalizeColumnName( col ))
+        col_joined = ", ".join(cols_normalized)
+    else:
+        col_joined = ", ".join(cols)
     sodacl_check_dict = {
         checks_for(model_name, quoting_config, check_type): [
             {
@@ -569,6 +668,7 @@ def check_model_duplicate_values(
         name=f"Check that model {model_name} has duplicate_count {threshold} for columns {col_joined}",
         model=model_name,
         field=None,
+        fieldname_original=col_joined_original,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -578,6 +678,11 @@ def check_model_duplicate_values(
 def check_property_duplicate_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
+
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -602,6 +707,7 @@ def check_property_duplicate_values(
         name=f"Check that field {field_name} has duplicate_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -611,6 +717,10 @@ def check_property_duplicate_values(
 def check_property_null_values(
     model_name: str, field_name: str, threshold: str, quoting_config: QuotingConfig = QuotingConfig()
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -635,6 +745,7 @@ def check_property_null_values(
         name=f"Check that field {field_name} has missing_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -648,6 +759,10 @@ def check_property_invalid_values(
     valid_values: list = None,
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -678,6 +793,7 @@ def check_property_invalid_values(
         name=f"Check that field {field_name} has invalid_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -691,6 +807,10 @@ def check_property_missing_values(
     missing_values: list = None,
     quoting_config: QuotingConfig = QuotingConfig(),
 ):
+    field_name_orig: str = field_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        field_name = NormalizeColumnName( field_name )
     if quoting_config.quote_field_name:
         field_name_for_soda = f'"{field_name}"'
     else:
@@ -723,6 +843,7 @@ def check_property_missing_values(
         name=f"Check that field {field_name} has missing_count {threshold}",
         model=model_name,
         field=field_name,
+        fieldname_original=field_name_orig,
         engine="soda",
         language="sodacl",
         implementation=yaml.dump(sodacl_check_dict),
@@ -736,6 +857,10 @@ def check_quality_list(
     quoting_config: QuotingConfig = QuotingConfig(),
     server: Server = None,
 ) -> List[Check]:
+    field_name_orig: str = property_name
+    if quoting_config.rewrite_csv_columnnames:
+        ## rewrite with function 'borrowed' from duckdb cpp code
+        property_name = NormalizeColumnName( property_name )
     checks: List[Check] = []
 
     count = 0
@@ -753,6 +878,7 @@ def check_quality_list(
                     name=quality.description if quality.description is not None else "Custom SodaCL Check",
                     model=schema_name,
                     field=property_name,
+                    fieldname_original=field_name_orig,
                     engine="soda",
                     language="sodacl",
                     implementation=quality.implementation,
@@ -797,9 +923,36 @@ def check_quality_list(
                     name=quality.description if quality.description is not None else "Quality Check",
                     model=schema_name,
                     field=property_name,
+                    fieldname_original=field_name_orig,
                     engine="soda",
                     language="sodacl",
                     implementation=yaml.dump(sodacl_check_dict),
+                )
+            )
+        # Take care of "custom python engine"
+        elif quality.type == "custom" and quality.engine == 'custom_python_engine':     ## ENGINE_KEYWORD: Final[str] = "custom_python_engine"
+            # take care of custom_python_engine and then anything else.
+            engine                  = quality.engine
+            implementationdetails   = quality.implementation
+            if property_name is None:
+                check_key = f"{schema_name}__{engine}_{count}"
+                check_type = "field_quality_custom_python_engine"
+            else:
+                check_key = f"{schema_name}__{property_name}__{engine}_{count}"
+                check_type = "model_quality_custom_python_engine"
+            checks.append(
+                Check(
+                    id=str(uuid.uuid4()),
+                    key=check_key,
+                    category="quality",
+                    type=check_type,
+                    name=quality.description if quality.description is not None else "Quality Check",
+                    model=schema_name,
+                    field=property_name,
+                    fieldname_original=field_name_orig,
+                    engine=engine,
+                    language="python",
+                    implementation=f"{implementationdetails}",
                 )
             )
         elif quality.metric is not None:
@@ -951,7 +1104,7 @@ def to_servicelevel_checks(data_contract: OpenDataContractStandard) -> List[Chec
 
     return checks
 
-
+## Fixme: test for normalize needs
 def to_sla_freshness_check(data_contract: OpenDataContractStandard, sla) -> Check | None:
     """Create a freshness check from an ODCS latency SLA property."""
     if sla.element is None:
@@ -1125,4 +1278,3 @@ def _parse_iso8601_to_seconds(duration: str) -> int | None:
         return int(match.group(1))
 
     return None
-
