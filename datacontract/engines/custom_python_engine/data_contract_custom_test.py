@@ -17,7 +17,7 @@ run.checks gets filtered for one type of engine.
 
 import os
 import typing
-
+import uuid
 import yaml
 
 if typing.TYPE_CHECKING:
@@ -119,6 +119,7 @@ def check_custom_python_engine_execute(
         else:
             run.checks.append(
                 Check(
+                    id=str(uuid.uuid4()),
                     type="general",
                     name="Check that format is supported",
                     result=ResultEnum.warning,

@@ -61,9 +61,16 @@ def execute_data_contract_test(
     # TODO check server credentials are complete for nicer error messages
     if server.format == "json" and server.type != "kafka":
         check_jsonschema(run, data_contract, server)
-    # TODO: check if some change to the test flow control should be applied if basic validation fails.
+    # TODO: check if some change to the test flow control should be applied if basic validation fails. Yep.
+
     if server.format == "csv" and server.type != "kafka":
-        check_csvschema.check_csvschema(run, data_contract, server)
+        test_csvschema_result: bool = check_csvschema.check_csvschema(run, data_contract, server)
+        #if test_csvschema_result == True:   ## Yepp, python fails on the same the same groovy truth logic problem behaviour.
+        #    check_soda_execute(run, data_contract, server, spark, duckdb_connection)
+        #else:
+            # in theory "skip", as the soda test should fail.
+    ## But we are running some tests here.
+    #else:
     check_soda_execute(run, data_contract, server, spark, duckdb_connection)
 
     ## Custom engine for additional checks. History: There was a need to run customized checks on more complex json data.

@@ -17,7 +17,8 @@ Yields:
 import io
 import logging
 import os
-from typing import Dict, List, Optional
+import uuid
+from typing import List, Optional
 
 import duckdb
 
@@ -53,16 +54,17 @@ def process_exceptions(run, exceptions: List[DataContractException], _file_locat
     for exception in exceptions:
         msg_base        = exception.message or DEFAULT_ERROR_MESSAGE
         msg_enhanced    = f"CSV-Validation, Error at location '{_file_locator}', message: \n{msg_base}"
-        cx = Check(
-                type=exception.type,
-                name=exception.name,
-                result=exception.result,
-                reason=exception.reason,
-                model=exception.model,
-                engine=exception.engine,
-                message=msg_enhanced,
-            )
-        run.checks.extend( cx )
+        ## Note: Cause of failure, seems that exception does not have all data needed .
+        run.checks.append(
+                          Check(
+                            id=str(uuid.uuid4()),
+                            type=exception.type,
+                            name=exception.name,
+                            result=exception.result,
+                            reason=exception.reason,
+                            model=exception.model,
+                            engine=exception.engine,
+                            message=msg_enhanced) )
     # NOTE RS: Don't raise an exeption here, as all other files won't be processed.
 
 ## maps duckdb type to data contract.
@@ -130,7 +132,7 @@ def run_datatest_for_schema_validation( datafile_in, column_index_to_test: int, 
                     cantDetermine.append(lc1)
                     forLoopShiftedContinue = True
 
-        if forLoopShiftedContinue:
+        if forLoopShiftedContinue == True:
             continue
 
         ## try parse.
@@ -241,7 +243,15 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
         ## fixme: bail out, this error case is a no-go
         NumberOfColumnsDoesNotMatchMessage: str = \
             f"Number of columns does not match. datasource has {number_elements_in_datasource} columns, #{number_elements_in_contract} are specified in the contract"
-        raise CSVSchemaValueException(NumberOfColumnsDoesNotMatchMessage)
+
+        raise CSVSchemaValueException(type="schema",
+                                      name='Column count mismatch between file and contract',
+                                      reason=NumberOfColumnsDoesNotMatchMessage,
+                                      engine='csvschema',
+                                      model=model_name,
+                                      original_exception=None,
+                                      result=ResultEnum.failed,
+                                      message=NumberOfColumnsDoesNotMatchMessage )
     # Test for diff in described schema and autodetected schema.
     fieldsClear:list            = []
     listOfFieldResults: list    = []
@@ -267,14 +277,14 @@ def validate( csv_obj, schema: dict, model_name: str, _delimiter = None ) -> dic
             columnNameMismatch = True
         if schemalogicalType != currentFieldType:
             # this gets dangerous, schema expects type date for this column, we have a mismatch, so go on and test all values of they can be parsed as type X
-            if columnNameMismatch:
+            if columnNameMismatch == True:
                 localmessage = f"Column type mismatch at {columnindex} with name: {schemaColumnName}, type: {schemalogicalType} does not match expected {currentFieldType}"
                 errorMessage = f"{errorMessage}\n {localmessage}"
                 typeErrorsCounter+=1
                 mx = fieldresult_pattern_a(columnindex, 'isTypeMismatch', True, localmessage, schemaColumnName, currentFieldName )
                 listOfFieldResults.append( mx )
 
-            if not columnNameMismatch:
+            if columnNameMismatch == False:
                 datatestresult = run_datatest_for_schema_validation( csv_obj, columnindex, schemaColumnName, schemalogicalType)
                 if not datatestresult['result'] and not datatestresult['NoDataInColumn']:
                     ## schema mismatch and data mismatch, leavo with Exceptio
@@ -396,7 +406,7 @@ def validate_csv(
                 )
                 exceptions.append(dcx)
 
-    if not exceptions:
+    if len(exceptions) == 0:
         logging.info(f"All CSV objects in the stream passed validation for model: '{model_name}'.")
     return exceptions
 
@@ -404,7 +414,13 @@ def validate_csv(
 def read_csv_file(file):
     ## file open -> return content
     rd: str = ''
-    with open(file,'r') as csv_file:
+    ## FIXME: Find out why sometimes there is an textiowrapper and then a classic filename.
+    currentFileNameDataIn: str = ''
+    if isinstance(file,io.TextIOWrapper):
+        currentFileNameDataIn = str(file.name)
+    else:
+        currentFileNameDataIn = file
+    with open(currentFileNameDataIn,'r') as csv_file:
         rd = csv_file.read()
     return rd
     ## note RS: removed the yield, will ruin the attempt
@@ -480,6 +496,7 @@ def process_s3_file(run, server, schema, model_name) -> bool:
     if csv_files_found is False:
         run.checks.append(
             Check(
+                id=str(uuid.uuid4()),
                 type="schema",
                 name="Check that csv has valid schema",
                 result=ResultEnum.warning,
@@ -499,6 +516,7 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
     if server.format != "csv":
         run.checks.append(
             Check(
+                id=str(uuid.uuid4()),
                 type="schema",
                 name="Check that csv has valid schema",
                 result=ResultEnum.warning,
@@ -507,12 +525,15 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
             )
         )
         run.log_warn("csvschema: Server format is not 'csv'. Skip csvschema checks.")
-        return
+        # returning true as this case should not be entered at all.
+        return True
 
     if not data_contract.schema_:
+        # Returning false, as without the model no other check makes sense.
         run.log_warn("csvschema: No models found. Skip csvschema checks.")
-        return
+        return False
 
+    ## Fixme: Take a look if considering all the models is relevant.
     #for model_name, model in iter(data_contract.models.items()):
     for schema_obj in data_contract.schema_:
         model_name = schema_obj.name
@@ -525,12 +546,22 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
         # Process files based on server type
         if server.type == "local":
             process_local_file(run, server, schema, model_name )
+            # NOTE: Is there anything else to evaluate ? Yes!
+            listOfFailed: list  = [x for x in run.checks if (x.result is not None and x.result.name == ResultEnum.failed )]
+            if len(listOfFailed) == 0:
+                return True
+            return False
         elif server.type == "s3":
             process_s3_file(run, server, schema, model_name )
-            # NOTE: Is there anything else to evaluate ?
+            # NOTE: Is there anything else to evaluate ? Yes!
+            listOfFailed: list  = [x for x in run.checks if (x.result is not None and x.result.name == ResultEnum.failed )]
+            if len(listOfFailed) == 0:
+                return True
+            return False
         elif server.type == "gcs":
             run.checks.append(
                 Check(
+                    id=str(uuid.uuid4()),
                     type="schema",
                     name="Check that csv has valid schema",
                     model=model_name,
@@ -539,9 +570,12 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
                     engine="csvschema",
                 )
             )
+            ## Fixme: is this valid ?
+            return False
         elif server.type == "azure":
             run.checks.append(
                 Check(
+                    id=str(uuid.uuid4()),
                     type="schema",
                     name="Check that csv has valid schema",
                     model=model_name,
@@ -550,9 +584,12 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
                     engine="csvschema",
                 )
             )
+            ## Fixme: is this valid ?
+            return False
         else:
             run.checks.append(
                 Check(
+                    id=str(uuid.uuid4()),
                     type="schema",
                     name="Check that csv has valid schema",
                     model=model_name,
@@ -561,18 +598,21 @@ def check_csvschema(run: Run, data_contract: OpenDataContractStandard, server: S
                     engine="csvschema",
                 )
             )
-            return
+            ## Fixme: is this valid ?
+            return False
 
-        run.checks.append(
-            Check(
-                type="schema",
-                name="Check that csv has valid schema",
-                model=model_name,
-                result=ResultEnum.passed,
-                reason="All csv entries are valid.",
-                engine="csvschema",
-            )
+    run.checks.append(
+        Check(
+            id=str(uuid.uuid4()),
+            type="schema",
+            name="Check that csv has valid schema",
+            model=model_name,
+            result=ResultEnum.passed,
+            reason="All csv entries are valid.",
+            engine="csvschema",
         )
+    )
+    return True
 
 #####
 ## Dirty copy & paste section from jsonschema_converter.

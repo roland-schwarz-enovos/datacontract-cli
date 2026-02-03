@@ -1,0 +1,77 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: urn:datacontract:team:number-management-and-trading:cnum-sftp
+name: CreativeNumbersPool
+version: 1.0.0
+dataProduct: CreativeNumbersPool
+status: active
+domain: creative_number_management
+description:
+  usage: some hourly number collection
+  purpose: Provides a different number for selected hours of the day.
+
+servers:
+  - location:
+    # Note: different contracts for the test cases, contract content is always the same, just with a different file
+    path: fixtures/csv_schema_validate/data/sample_data_no_errors.csv
+    type: local
+    format: csv
+    # This needs to be added in the contract. Without the run will fail as the tools doen not know how to interpret the data.
+    # Options: new_line, array, none
+    delimiter: new_line
+    server: local
+    description: local
+    environment: uat
+
+## Note to the concerned reader: name and physicalname have to match for duckdb, otherwise there will be an errore.
+schema:
+  - name: dayahead_prices
+    logicalType: object
+    physicalName: dayahead_prices
+    dataGranularityDescription: Hourly energy prices
+    properties:
+      - name: CurrentDay
+        logicalType: date
+        physicalType: DATE
+        required: true
+      - name: Hour_1        ## note: some part of the yaml syntax/soda translation does not allow spaces in table names.
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Hour_2
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Hour_3
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Hour_4
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: 'MiddleNight'
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Morning
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Afternoon
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Evening
+        logicalType: number
+        physicalType: decimal
+        required: true
+      - name: Sunpeak
+        logicalType: number
+        physicalType: decimal
+        required: true
+
+# Note: add quotes to date values or change the contract parsing.
+# Context: when pylancin' this, python will create a datatype date with timestamp.
+# The descriptor of odcs expects a string type and creating an object will fail with an inconclusive message.
+contractCreatedTs: '2025-03-12T14:49:28+00:00'
